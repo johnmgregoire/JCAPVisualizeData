@@ -430,6 +430,7 @@ class visdataDialog(QDialog):
         
         #comp plot
         #self.plotw_stack.fig.clf()
+        self.stackedplotsetup()
         permcomp=self.comp[:, self.comppermuteinds]
         self.cbax_stack.cla()
         if self.fom is None:
@@ -439,11 +440,11 @@ class visdataDialog(QDialog):
             fomcol=numpy.array(fomcol)
             self.stackplotfcn(permcomp, fomcol, self.plotw_stack_stpl, s=8, edgecolors='none')
         else:
-            self.stackplotfcn(permcomp[inds], self.fom[inds], self.plotw_stack_stpl, s=8, edgecolors='none', cmap=self.cmap, norm=self.norm, extend=self.extend, cb=False)
-            sm=cm.ScalarMappable(norm=self.norm, cmap=self.cmap, extend=self.extend)
+            self.stackplotfcn(permcomp[inds], self.fom[inds], self.plotw_stack_stpl, s=8, edgecolors='none', cmap=self.cmap, norm=self.norm, cb=False)
+            sm=cm.ScalarMappable(norm=self.norm, cmap=self.cmap)
             sm.set_array(self.fom[inds])
             
-            cb=self.plotw_stack_stpl[0].figure.colorbar(sm, cax=self.cbax_stack)
+            cb=self.plotw_stack.fig.colorbar(sm, cax=self.cbax_stack)
             cb.set_label(self.fomkey, fontsize=18)
         
         self.plotw_stack.fig.canvas.draw()
@@ -486,9 +487,8 @@ class visdataDialog(QDialog):
         aclick=1.-xc-bclick/2.
         cclick=1.-aclick-bclick
         compclick=numpy.array([aclick, bclick, cclick, dclick])
-        print compclick
         compclick[:3]*=1.-dclick
-        print compclick
+        
         permcomp=self.comp[:, self.comppermuteinds]
         
         dist=numpy.array([(((c-compclick)**2).sum())**.5 for c in permcomp])
@@ -515,10 +515,10 @@ class visdataDialog(QDialog):
             return
         overlaybool=self.overlayselectCheckBox.isChecked()
         if not overlaybool:
-            self.plotw_select.axes.cla()
+            self.plotw_xy.axes.cla()
         xk=str(self.xplotchoiceComboBox.currentText())
         yk=str(self.yplotchoiceComboBox.currentText())
-        if self.yplotchoiceComboBox.currentIndex()==0:
+        if self.xycolplotchoiceComboBox.currentIndex()==0:
             plotillumkey=None
         else:
             plotillumkey=str(self.xycolplotchoiceComboBox.currentText())
@@ -540,30 +540,36 @@ class visdataDialog(QDialog):
             if k is None:
                 continue
             if k in d['rawkeys']:
-                plotdata+=[dfile['rawkeys'][k]]
+                plotdata+=[dfile['raw_arrays'][k]]
             else:
-                plotdata+=[dfile['interkeys'][k]]
-            
-           
-        lab='%d' %d['Sample']
-        self.plotw_select.axes.plot(plotdata[0], plotdata[1], '.-', label=lab)
+                plotdata+=[dfile['intermediate_arrays'][k]]
         
-        autotickformat(self.plotw_select.axes, x=1, y=1)
+        #if all raw len then leave but if some interlen then take the rawlen and index down to interlen
+        minlen=min([len(v) for v in plotdata])
+        if minlen!=self.rawlen:
+            for count, v in enumerate(plotdata):
+                if len(v)==self.rawlen:
+                    plotdata[count]=v[self.rawselectinds]
+                    
+        lab='%d' %d['sample_no']
+        self.plotw_xy.axes.plot(plotdata[0], plotdata[1], '.-', label=lab)
+        
+        autotickformat(self.plotw_xy.axes, x=1, y=1)
 
         if (not plotillumkey is None) and plotillumkey in d.keys() and not overlaybool:
             illuminds=numpy.where(plotdata[2])[0]
-            self.plotw_select.axes.plot(plotdata[0][illuminds], plotdata[1][illuminds], 'y.')
-        self.plotw_select.axes.set_xlabel(xk)
-        self.plotw_select.axes.set_ylabel(yk)
-        leg=self.plotw_select.axes.legend(loc=0)
+            self.plotw_xy.axes.plot(plotdata[0][illuminds], plotdata[1][illuminds], 'y.')
+        self.plotw_xy.axes.set_xlabel(xk)
+        self.plotw_xy.axes.set_ylabel(yk)
+        leg=self.plotw_xy.axes.legend(loc=0)
         leg.draggable()
-        self.plotw_select.fig.canvas.draw()
+        self.plotw_xy.fig.canvas.draw()
     def sampleline_ind(self):
         plated=self.platemapdlist[self.platemapindswithdata[self.selectind]]
         s='\t'.join([fmtstr %plated[k] for fmtstr, k in self.linefields])
         if len(self.datadlist)>0:
             fomd=self.datadlist[self.selectind]['fomd']
-            s+='\t'+'\t'.join([(((k in fomd.keys()) and ('%.3e', )) or ('',))[0] %fomd[k] for k in self.allfomkeys])
+            s+='\t'+'\t'.join([(((k in fomd.keys()) and ('%.3e' %fomd[k], )) or ('',))[0] for k in self.allfomkeys])
         return s
         
     def addtoselectsamples(self, plot=True):# self.selectind
@@ -619,7 +625,7 @@ class visdataDialog(QDialog):
     
     def loadPckKeys(self, p, keys=None):
         try:
-            f=open(p2, mode='r')
+            f=open(p, mode='r')
             d=pickle.load(f)
             f.close()
             if keys is None:
@@ -629,6 +635,7 @@ class visdataDialog(QDialog):
             return None
             
     def openDataFolder(self):
+        #p='C:/Users/Gregoire/Documents/demodata/v2'
         p=mygetdir(parent=self, markstr='select folder with .pck files')
         if p is None or p=='':
             return
@@ -644,25 +651,35 @@ class visdataDialog(QDialog):
             p2=os.path.join(p, fn)
             tup=self.loadPckKeys(p2, keys=['measurement_info', "fom", 'raw_arrays', 'intermediate_arrays'])
             if tup is None:
+                print 'error with format of ', p
                 continue
             infod, fomd, rawd, interd=tup
-            if not 'sample_no' in infod.keys() or not infod['sample_no'] in self.platemapsmplist:
+            temp=[infod[k] for k in ['sample_no', 'Sample No', 'Sample'] if k in infod.keys()]
+            if len(temp)==0 or not temp[0] in self.platemapsmplist:
+                print 'error with sample_no. ', temp
                 continue
-            smp=infod['sample_no']
+            smp=temp[0]
+            infod['sample_no']=smp
             i=self.platemapsmplist.index(smp)
             self.platemapindswithdata+=[i]
             self.smplist+=[smp]
             d={}
-            for k, v in info.iteritems():
+            for k, v in infod.iteritems():
                 d[k]=v
             d['platemapind']=i
             d['p']=p2
             for v in rawd.itervalues():
                 if isinstance(v, numpy.ndarray) and v.ndim==1:
-                    rawshape=v.shape
+                    self.rawlen=len(v)
                     break
-            d['rawkeys']=[k for k, v in rawd.iteritems() if isinstance(v, numpy.ndarray) and v.shape==rawshape]
-            d['interkeys']=[k for k, v in interd.iteritems() if isinstance(v, numpy.ndarray) and v.shape==rawshape]
+            d['rawkeys']=[k for k, v in rawd.iteritems() if isinstance(v, numpy.ndarray) and len(v)==self.rawlen]
+            if 'rawselectinds' in interd.keys():
+                self.interlen=len(interd['rawselectinds'])
+                self.rawselectinds=interd['rawselectinds']
+            else:
+                self.interlen=self.rawlen
+                self.rawselectinds=range(self.rawlen)
+            d['interkeys']=[k for k, v in interd.iteritems() if isinstance(v, numpy.ndarray) and (len(v)==self.interlen or len(v)==self.rawlen)]
             #don't filter fom keys, assume the values are scalars
             d['fomd']=fomd
             d['fomkeys']=fomd.keys()
@@ -710,8 +727,8 @@ class visdataDialog(QDialog):
         self.fomcolorselected()
 
     def openPlateMap(self):
-        #p=mygetopenfile(parent=self, markstr='select platemap .txt')
-        p='C:/Users/Gregoire/Documents/CaltechWork/platemaps/v8/plate500_100mm_v8_pl1.txt'
+        p=mygetopenfile(parent=self, markstr='select platemap .txt')
+        #p='C:/Users/Gregoire/Documents/CaltechWork/platemaps/v8/plate500_100mm_v8_pl1.txt'
         if p is None or p=='':
             return
         self.fileLineEdit.setText(p)
@@ -753,7 +770,7 @@ class visdataDialog(QDialog):
         self.fomcolorselected() #this runs self.plot
 
     def fomcolorselected(self):
-        if self.fomComboBox.currentIndex()==0:
+        if self.fomComboBox.currentIndex()==0 or len(self.datadlist)==0:
             self.fom=None
         else:
             k=str(self.fomComboBox.currentText())
@@ -763,7 +780,9 @@ class visdataDialog(QDialog):
             self.vmin=fomnotnan.min()
             self.vmax=fomnotnan.max()
             self.rev_cols=None
-        self.plot()
+            self.editfomopts(dflt=True)
+        if len(self.platemapindswithdata)>0:
+            self.plot()
 
     def editfomopts(self, dflt=False):
         if self.fom is None:
@@ -778,7 +797,7 @@ class visdataDialog(QDialog):
         if dflt or fomoptswidget.error:
             self.cmap=cm.jet
             self.skipoutofrange=[False, False]
-            
+
         
         self.norm=colors.Normalize(vmin=self.vmin, vmax=self.vmax, clip=False)
         
