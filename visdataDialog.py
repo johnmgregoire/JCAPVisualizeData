@@ -1,8 +1,9 @@
-
+from readtxt import smp_dict_generaltxt
 
 from visualize_ui import *
-
-#
+import copy
+#fom file import not tested
+#doesn't expect more than 1 file per sample. in that case proabbly first one it fins is the one that gets auto-plotted with click but not sure
 class filtersampleswidget(QDialog):
     def __init__(self, parent=None, title='', arr=None):
         super(filtersampleswidget, self).__init__(parent)
@@ -103,11 +104,13 @@ class fomplotoptions(QDialog):
         templab.setText('below,above range colors:\nEnter a char,0-1 gray,tuple,\n"None" for ignore')
         
         self.aboverangecolLineEdit=QLineEdit()
-        self.aboverangecolLineEdit.setText('k')
         self.belowrangecolLineEdit=QLineEdit()
-        self.belowrangecolLineEdit.setText('0.9')
+        
         
         if rev_cols is None or len(rev_cols=None)!=3:
+            self.aboverangecolLineEdit.setText('k')
+            self.belowrangecolLineEdit.setText('0.9')
+        else:
             self.revcmapCheckBox.setChecked(rev_cols[0])
             self.belowrangecolLineEdit.setText(rev_cols[1])
             self.aboverangecolLineEdit.setText(rev_cols[2])
@@ -235,7 +238,7 @@ class visdataDialog(QDialog):
         self.folderLineEdit=QLineEdit()        
         self.folderLineEdit.setText('')
         folderLineEditLabel=QLabel()
-        folderLineEditLabel.setText('Folder with\nPck Data:')
+        folderLineEditLabel.setText('Folder with\nPck\Txt Data:')
         folderLineEditlayout=QVBoxLayout()
 
         ternstackComboBoxLabel=QLabel()
@@ -531,9 +534,12 @@ class visdataDialog(QDialog):
                 print 'aborting because data key not available for this sample: ', k
                 return
 
-        f=open(d['p'], mode='r')
-        dfile=pickle.load(f)
-        f.close()
+        if d['raw_arrays'] is None:#open pck 
+            f=open(d['p'], mode='r')
+            dfile=pickle.load(f)
+            f.close()
+        else:#arrays already story in d
+            dfile=d
         
         plotdata=[]
         for k in [xk, yk, plotillumkey]:
@@ -646,53 +652,104 @@ class visdataDialog(QDialog):
         self.allarrkeys=[]
         self.datadlist=[]
         for fn in os.listdir(p):
-            if not fn.endswith('.pck'):
-                return
-            p2=os.path.join(p, fn)
-            tup=self.loadPckKeys(p2, keys=['measurement_info', "fom", 'raw_arrays', 'intermediate_arrays'])
-            if tup is None:
-                print 'error with format of ', p
-                continue
-            infod, fomd, rawd, interd=tup
-            temp=[infod[k] for k in ['sample_no', 'Sample No', 'Sample'] if k in infod.keys()]
-            if len(temp)==0 or not temp[0] in self.platemapsmplist:
-                print 'error with sample_no. ', temp
-                continue
-            smp=temp[0]
-            infod['sample_no']=smp
-            i=self.platemapsmplist.index(smp)
-            self.platemapindswithdata+=[i]
-            self.smplist+=[smp]
-            d={}
-            for k, v in infod.iteritems():
-                d[k]=v
-            d['platemapind']=i
-            d['p']=p2
-            for v in rawd.itervalues():
-                if isinstance(v, numpy.ndarray) and v.ndim==1:
-                    self.rawlen=len(v)
-                    break
-            d['rawkeys']=[k for k, v in rawd.iteritems() if isinstance(v, numpy.ndarray) and len(v)==self.rawlen]
-            if 'rawselectinds' in interd.keys():
-                self.interlen=len(interd['rawselectinds'])
-                self.rawselectinds=interd['rawselectinds']
+            if fn.endswith('.txt') or fn.endswith('.opt'):
+                p2=os.path.join(p, fn)
+                smp, dtxt=smp_dict_generaltxt(p2)
+                #forcerror
+                if smp is None:#FOM txt file, no array but many samples and foms
+                    smpk=[k for k in ['sample_no', 'Sample No', 'Sample'] if k in dtxt.keys()]
+                    if len(smpk)==0:
+                        print 'invalid text file ', p2
+                        continue
+                    smpk=smpk[0]
+                    for count, smp in enumerate(dtxt[smpk]):
+                        if not smp in self.platemapsmplist:
+                            continue
+                        d={}
+                        d['sample_no']=smp
+                        i=self.platemapsmplist.index(smp)
+                        self.platemapindswithdata+=[i]
+                        self.smplist+=[smp]
+                        d['platemapind']=i
+                        d['p']=p2
+                        d['rawkeys']=[]
+                        d['raw_arrays']=None
+                        d['interkeys']=[]
+                        d['fomd']=dict([(k, v[count]) for k, v in dtxt.iteritems()])
+                        d['fomkeys']=dtxt.keys()
+                        self.allfomkeys+=[k for k in d['fomkeys'] if not k in self.allfomkeys]
+                        self.allarrkeys+=[k for k in d['rawkeys']+d['interkeys'] if not k in self.allarrkeys]
+                        self.datadlist+=[d]
+                else:#raw data txt file, 1 sample
+                    if not smp in self.platemapsmplist:
+                        continue
+                    d={}
+                    d['sample_no']=smp
+                    i=self.platemapsmplist.index(smp)
+                    self.platemapindswithdata+=[i]
+                    self.smplist+=[smp]
+                    d['platemapind']=i
+                    d['p']=p2
+                    d['rawkeys']=dtxt.keys()
+                    d['raw_arrays']=copy.copy(dtxt)
+                    self.rawlen=len(dtxt[dtxt.keys()[0]])
+                    d['interkeys']=[]
+                    d['fomd']={}
+                    d['fomkeys']=[]
+                    self.allfomkeys+=[k for k in d['fomkeys'] if not k in self.allfomkeys]
+                    self.allarrkeys+=[k for k in d['rawkeys']+d['interkeys'] if not k in self.allarrkeys]
+                    self.datadlist+=[d]
+            elif fn.endswith('.pck'):#from here on out, pck file = 1 sample with both arrays and fom, must have rawd with an array inside
+                
+                p2=os.path.join(p, fn)
+                tup=self.loadPckKeys(p2, keys=['measurement_info', "fom", 'raw_arrays', 'intermediate_arrays'])
+                if tup is None:
+                    print 'error with format of ', p
+                    continue
+                infod, fomd, rawd, interd=tup
+                temp=[infod[k] for k in ['sample_no', 'Sample No', 'Sample'] if k in infod.keys()]
+                if len(temp)==0 or not temp[0] in self.platemapsmplist:
+                    print 'error with sample_no. ', temp
+                    #raise
+                    continue
+                smp=temp[0]
+                infod['sample_no']=smp
+                i=self.platemapsmplist.index(smp)
+                self.platemapindswithdata+=[i]
+                self.smplist+=[smp]
+                d={}
+                for k, v in infod.iteritems():
+                    d[k]=v
+                d['platemapind']=i
+                d['p']=p2
+                for v in rawd.itervalues():
+                    if isinstance(v, numpy.ndarray) and v.ndim==1:
+                        self.rawlen=len(v)
+                        break
+                d['rawkeys']=[k for k, v in rawd.iteritems() if isinstance(v, numpy.ndarray) and len(v)==self.rawlen]
+                d['raw_arrays']=None
+                if 'rawselectinds' in interd.keys():
+                    self.interlen=len(interd['rawselectinds'])
+                    self.rawselectinds=interd['rawselectinds']
+                else:
+                    self.interlen=self.rawlen
+                    self.rawselectinds=range(self.rawlen)
+                d['interkeys']=[k for k, v in interd.iteritems() if isinstance(v, numpy.ndarray) and (len(v)==self.interlen or len(v)==self.rawlen)]
+                #don't filter fom keys, assume the values are scalars
+                d['fomd']=fomd
+                d['fomkeys']=fomd.keys()
+                
+
+                self.allfomkeys+=[k for k in d['fomkeys'] if not k in self.allfomkeys]
+                self.allarrkeys+=[k for k in d['rawkeys']+d['interkeys'] if not k in self.allarrkeys]
+                self.datadlist+=[d]
             else:
-                self.interlen=self.rawlen
-                self.rawselectinds=range(self.rawlen)
-            d['interkeys']=[k for k, v in interd.iteritems() if isinstance(v, numpy.ndarray) and (len(v)==self.interlen or len(v)==self.rawlen)]
-            #don't filter fom keys, assume the values are scalars
-            d['fomd']=fomd
-            d['fomkeys']=fomd.keys()
-            
-            self.allfomkeys+=[k for k in d['fomkeys'] if not k in self.allfomkeys]
-            self.allarrkeys+=[k for k in d['rawkeys']+d['interkeys'] if not k in self.allarrkeys]
-            for sortkey in ['Wavelength (nm)', 't(s)']:
-                if sortkey in self.allarrkeys:
-                    self.allarrkeys=[self.allarrkeys.pop(self.allarrkeys.index(sortkey))]+self.allarrkeys
-            
-            self.datadlist+=[d]
-            
-        #here the platemap is sorted to the data 
+                continue
+#here the platemap is sorted to the data 
+        
+        for sortkey in ['Wavelength (nm)', 't(s)']:
+            if sortkey in self.allarrkeys:
+                self.allarrkeys=[self.allarrkeys.pop(self.allarrkeys.index(sortkey))]+self.allarrkeys
         self.x=numpy.array(self.extractlist_dlistkey('x'))[self.platemapindswithdata]
         self.y=numpy.array(self.extractlist_dlistkey('y'))[self.platemapindswithdata]
         self.col=numpy.array(self.extractlist_dlistkey('col'))[self.platemapindswithdata]
