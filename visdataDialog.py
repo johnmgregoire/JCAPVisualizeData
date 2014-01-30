@@ -107,7 +107,7 @@ class fomplotoptions(QDialog):
         self.belowrangecolLineEdit=QLineEdit()
         
         
-        if rev_cols is None or len(rev_cols=None)!=3:
+        if rev_cols is None or len(rev_cols)!=3:
             self.aboverangecolLineEdit.setText('k')
             self.belowrangecolLineEdit.setText('0.9')
         else:
@@ -276,7 +276,10 @@ class visdataDialog(QDialog):
         selectFolder.setText("select\ndata folder")
         QObject.connect(selectFolder, SIGNAL("pressed()"), self.openDataFolder)
         
-        
+        self.codesLineEdit=QLineEdit()        
+        self.codesLineEdit.setText('')
+        codesLineEditLabel=QLabel()
+        codesLineEditLabel.setText('only show these codes:\nwhen open platemap')
         
         addComp=QPushButton()
         addComp.setText("add")
@@ -326,9 +329,10 @@ class visdataDialog(QDialog):
         self.ctrlgriditems=[\
         (fileLineEditLabel, self.fileLineEdit, 0, 0),\
         (folderLineEditLabel, self.folderLineEdit, 1, 0),\
-        (compLineEditLabel, self.compLineEdit, 2, 0), \
-        (xyLineEditLabel, self.xyLineEdit, 3, 0),\
-        (sampleLineEditLabel, self.sampleLineEdit, 4, 0),\
+        (codesLineEditLabel, self.codesLineEdit, 2, 0), \
+        (compLineEditLabel, self.compLineEdit, 3, 0), \
+        (xyLineEditLabel, self.xyLineEdit, 4, 0),\
+        (sampleLineEditLabel, self.sampleLineEdit, 5, 0),\
         ]
         
         mainlayout=QGridLayout()
@@ -341,23 +345,23 @@ class visdataDialog(QDialog):
         
         ctrllayout.addWidget(selectMap, 0, 1)
         #ctrllayout.addWidget(savesampleButton, 0, 2) don't have save yet, just copy text
-        ctrllayout.addWidget(selectFolder, 0, 2)
-        ctrllayout.addWidget(ternstackComboBoxLabel, 1, 1)
-        ctrllayout.addWidget(self.ternstackComboBox, 1, 2)
+        ctrllayout.addWidget(selectFolder, 1, 1)
+        ctrllayout.addWidget(ternstackComboBoxLabel, 2, 1)
+        ctrllayout.addWidget(self.ternstackComboBox, 2, 2)
 
-        ctrllayout.addWidget(addComp, 2, 1)
-        ctrllayout.addWidget(remComp, 2, 2)
-        ctrllayout.addWidget(addxy, 3, 1)
-        ctrllayout.addWidget(remxy, 3, 2)
-        ctrllayout.addWidget(addSample, 4, 1)
-        ctrllayout.addWidget(remSample, 4, 2)
+        ctrllayout.addWidget(addComp, 3, 1)
+        ctrllayout.addWidget(remComp, 3, 2)
+        ctrllayout.addWidget(addxy, 4, 1)
+        ctrllayout.addWidget(remxy, 4, 2)
+        ctrllayout.addWidget(addSample, 5, 1)
+        ctrllayout.addWidget(remSample, 5, 2)
         
         ctrlbottomlayout=QHBoxLayout()
         ctrlbottomlayout.addWidget(fomComboBoxLabel)
         ctrlbottomlayout.addWidget(self.fomComboBox)
         ctrlbottomlayout.addWidget(fomplotoptsPushButton)
         ctrlbottomlayout.addWidget(filtersmpsPushButton)
-        ctrllayout.addLayout(ctrlbottomlayout, 5, 0, 1, 3)
+        ctrllayout.addLayout(ctrlbottomlayout, 6, 0, 1, 3)
         
         self.browser = QTextBrowser()
         self.browser.setLineWrapMode(QTextEdit.NoWrap)
@@ -747,7 +751,7 @@ class visdataDialog(QDialog):
                 continue
 #here the platemap is sorted to the data 
         
-        for sortkey in ['Wavelength (nm)', 't(s)']:
+        for sortkey in ['Wavelength(nm)', 't(s)']:
             if sortkey in self.allarrkeys:
                 self.allarrkeys=[self.allarrkeys.pop(self.allarrkeys.index(sortkey))]+self.allarrkeys
         self.x=numpy.array(self.extractlist_dlistkey('x'))[self.platemapindswithdata]
@@ -792,9 +796,13 @@ class visdataDialog(QDialog):
 
         self.platemapdlist=readsingleplatemaptxt(p)
         
-#        codesstr=str(self.codesLineEdit.text())
-#        self.filterbycodes=eval('['+codesstr+']')
-#        self.platemapdlist=[d for d in self.platemapdlist if d['code'] in self.filterbycodes]
+        codesstr=str(self.codesLineEdit.text())
+        if len(codesstr.strip())>0:
+            try:
+                self.filterbycodes=eval('['+codesstr+']')
+                self.platemapdlist=[d for d in self.platemapdlist if d['code'] in self.filterbycodes]
+            except:
+                print 'error filtering by codes ', codesstr
         for d in self.platemapdlist:
             d['comp']=numpy.array([d[k] for k in ['A', 'B', 'C', 'D']])
             d['col']=self.quat.rgb_comp([d['comp']])[0]
@@ -829,6 +837,8 @@ class visdataDialog(QDialog):
     def fomcolorselected(self):
         if self.fomComboBox.currentIndex()==0 or len(self.datadlist)==0:
             self.fom=None
+            if len(self.platemapindswithdata)>0:
+                self.plot()
         else:
             k=str(self.fomComboBox.currentText())
             self.fom=numpy.array([(k in d['fomd'].keys() and (d['fomd'][k],) or (numpy.nan,))[0] for d in self.datadlist])
@@ -838,8 +848,7 @@ class visdataDialog(QDialog):
             self.vmax=fomnotnan.max()
             self.rev_cols=None
             self.editfomopts(dflt=True)
-        if len(self.platemapindswithdata)>0:
-            self.plot()
+        
 
     def editfomopts(self, dflt=False):
         if self.fom is None:
@@ -867,7 +876,8 @@ class visdataDialog(QDialog):
             self.extend='min'
         else:
             self.extend='neither'
-        
+        if len(self.platemapindswithdata)>0:
+            self.plot()
     
     def filtersmpbyfom(self):
         if self.fom is None:

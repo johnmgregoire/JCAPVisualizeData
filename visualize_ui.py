@@ -368,3 +368,12 @@ class plotwidget(FigureCanvas):
             self.clicklist+=[arrayxy]
             self.emit(SIGNAL("genericclickonplot"), [event.xdata, event.ydata, event.button, event.inaxes])
 
+def col_string(s):
+    s=s.strip()
+    if ('(' in s) and (')' in s):
+        try:
+            s=eval(s)
+        except:
+            return None
+    cc=colors.ColorConverter()
+    return cc.to_rgb(s)
