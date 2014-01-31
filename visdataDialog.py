@@ -213,11 +213,13 @@ class visdataDialog(QDialog):
 
         xplotchoiceComboBoxLabel=QLabel()
         xplotchoiceComboBoxLabel.setText('x-axis')
+        
         yplotchoiceComboBoxLabel=QLabel()
         yplotchoiceComboBoxLabel.setText('y-axis')
         xycolplotchoiceComboBoxLabel=QLabel()
         xycolplotchoiceComboBoxLabel.setText('color by')
         self.xplotchoiceComboBox=QComboBox()
+        self.xplotchoiceComboBox.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.yplotchoiceComboBox=QComboBox()
         self.xycolplotchoiceComboBox=QComboBox()
 #        for i, nam in enumerate(['t(s)', 'I(A)', 'Ewe(V)', 'Ece(V)']):
@@ -313,6 +315,7 @@ class visdataDialog(QDialog):
         fomComboBoxLabel=QLabel()
         fomComboBoxLabel.setText('select\nFOM:')
         self.fomComboBox=QComboBox()
+        self.fomComboBox.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.fomComboBox.clear()
         self.fomComboBox.insertItem(0, 'composition/selected')
         self.fomComboBox.setCurrentIndex(0)
@@ -789,7 +792,7 @@ class visdataDialog(QDialog):
 
     def openPlateMap(self):
         p=mygetopenfile(parent=self, markstr='select platemap .txt')
-        #p='C:/Users/Gregoire/Documents/CaltechWork/platemaps/v8/plate500_100mm_v8_pl1.txt'
+        #p='C:/Users/Gregoire/Documents/CaltechWork/platemaps/0037-04-0730-mp.txt'
         if p is None or p=='':
             return
         self.fileLineEdit.setText(p)
