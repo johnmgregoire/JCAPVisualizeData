@@ -187,15 +187,11 @@ class visdataDialog(QDialog):
         self.parent=parent
         
 
-        axrect=[.85, .3, .04, .4]
+        self.plotw_stack_cbaxrect=[.85, .1, .04, .8]
         
         self.plotw_stack=plotwidget(self)
-        self.plotw_stack.axes.set_xlabel('')
-        self.plotw_stack.axes.set_ylabel('')
-        self.plotw_stack.axes.set_aspect(1)
-        
-        
-        self.cbax_stack=self.plotw_stack.fig.add_axes(axrect)
+
+        self.cbax_stack=self.plotw_stack.fig.add_axes(self.plotw_stack_cbaxrect)
         
         axrect=[0.82, 0.1, 0.04, 0.8]
         
@@ -428,7 +424,7 @@ class visdataDialog(QDialog):
         else:
             m=self.plotw_plate.axes.scatter(self.x[inds], self.y[inds], c=self.fom[inds], s=s_plate, marker='s', cmap=self.cmap, norm=self.norm, edgecolor='none')
             cb=self.plotw_plate.fig.colorbar(m, cax=self.cbax_plate, extend=self.extend, format=autocolorbarformat((self.vmin, self.vmax)))
-            
+            cb.set_label(self.fomkey, fontsize=18)
         for i in self.sampleselectinds:
             circ = pylab.Circle((self.x[i], self.y[i]), radius=1, edgecolor='r', facecolor='none')
             self.plotw_plate.axes.add_patch(circ)
@@ -439,7 +435,7 @@ class visdataDialog(QDialog):
         self.plotw_plate.fig.canvas.draw()
         
         #comp plot
-        #self.plotw_stack.fig.clf()
+        
         self.stackedplotsetup()
         permcomp=self.comp[:, self.comppermuteinds]
         self.cbax_stack.cla()
@@ -634,6 +630,7 @@ class visdataDialog(QDialog):
         self.stackcompinterv=1./intervchoice
         self.plotw_stack.fig.clf()
         self.plotw_stack_axl, self.plotw_stack_stpl=makefcn(fig=self.plotw_stack.fig, ellabels=self.ellabels)
+        self.cbax_stack=self.plotw_stack.fig.add_axes(self.plotw_stack_cbaxrect)
 
     
     def loadPckKeys(self, p, keys=None):
