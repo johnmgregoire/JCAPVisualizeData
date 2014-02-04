@@ -108,8 +108,8 @@ class fomplotoptions(QDialog):
         
         
         if rev_cols is None or len(rev_cols)!=3:
-            self.aboverangecolLineEdit.setText('k')
-            self.belowrangecolLineEdit.setText('0.9')
+            self.belowrangecolLineEdit.setText('k')
+            self.aboverangecolLineEdit.setText('(0.5,0,0)')
         else:
             self.revcmapCheckBox.setChecked(rev_cols[0])
             self.belowrangecolLineEdit.setText(rev_cols[1])
@@ -447,10 +447,12 @@ class visdataDialog(QDialog):
             self.stackplotfcn(permcomp, fomcol, self.plotw_stack_stpl, s=8, edgecolors='none')
         else:
             self.stackplotfcn(permcomp[inds], self.fom[inds], self.plotw_stack_stpl, s=8, edgecolors='none', cmap=self.cmap, norm=self.norm, cb=False)
+            
             sm=cm.ScalarMappable(norm=self.norm, cmap=self.cmap)
             sm.set_array(self.fom[inds])
+            cb=self.plotw_stack.fig.colorbar(sm, cax=self.cbax_stack, extend=self.extend, format=autocolorbarformat((self.vmin, self.vmax)))
             
-            cb=self.plotw_stack.fig.colorbar(sm, cax=self.cbax_stack)
+            #cb=self.plotw_stack.fig.colorbar(m, cax=self.cbax_plate, extend=self.extend))
             cb.set_label(self.fomkey, fontsize=18)
         
         self.plotw_stack.fig.canvas.draw()
@@ -656,7 +658,7 @@ class visdataDialog(QDialog):
         self.allarrkeys=[]
         self.datadlist=[]
         for fn in os.listdir(p):
-            if fn.endswith('.txt') or fn.endswith('.opt'):
+            if fn.endswith('.txt') or fn.endswith('.opt') or fn.endswith('.smp'):
                 p2=os.path.join(p, fn)
                 smp, dtxt=smp_dict_generaltxt(p2)
                 #forcerror
