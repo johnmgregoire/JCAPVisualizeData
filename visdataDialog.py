@@ -4,6 +4,77 @@ from visualize_ui import *
 import copy
 #fom file import not tested
 #doesn't expect more than 1 file per sample. in that case proabbly first one it fins is the one that gets auto-plotted with click but not sure
+
+
+class legendformatwidget(QDialog):
+    def __init__(self, parent=None, title='', arr=None):
+        super(legendformatwidget, self).__init__(parent)
+        self.parent=parent
+
+        templab=QLabel()
+        templab.setText('fom fmt')
+        self.fomfmtLineEdit=QLineEdit()
+        self.fomfmtLineEdit.setText('%.2e')
+        
+        templab2=QLabel()
+        templab2.setText('comp fmt')
+        self.compfmtLineEdit=QLineEdit()
+        self.compfmtLineEdit.setText('%d')
+        
+        templab3=QLabel()
+        templab3.setText('legend contents, for example\n<sample>, <A><a><B><b><C><c><D><d>, <code>, <fom>')
+        self.legendLineEdit=QLineEdit()
+        self.legendLineEdit.setText('<sample>')
+        
+        mainlayout=QGridLayout()
+        mainlayout.addWidget(templab, 0, 0)
+        mainlayout.addWidget(self.fomfmtLineEdit, 1, 0)
+        mainlayout.addWidget(templab2, 0, 1)
+        mainlayout.addWidget(self.compfmtLineEdit, 1, 1)
+        mainlayout.addWidget(templab3, 2, 0, 1, 2)
+        mainlayout.addWidget(self.legendLineEdit, 3, 0, 1, 2)
+        
+        self.buttonBox = QDialogButtonBox(self)
+        self.buttonBox.setGeometry(QRect(520, 195, 160, 26))
+        self.buttonBox.setOrientation(Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Ok)
+        QObject.connect(self.buttonBox, SIGNAL("accepted()"), self.accept)
+        mainlayout.addWidget(self.buttonBox, 4, 0, 1, 2)
+    
+        QObject.connect(self.buttonBox,SIGNAL("accepted()"),self.ExitRoutine)
+        #QObject.connect(self.buttonBox,SIGNAL("rejected()"),self.ExitRoutineCancel)
+        
+        self.setLayout(mainlayout)
+
+        self.resize(300, 250)
+        self.selectinds=[]
+    
+    def ExitRoutine(self):
+        fomfmt=str(self.fomfmtLineEdit.text())
+        compfmt=str(self.compfmtLineEdit.text())
+        legendcmd=str(self.legendLineEdit.text())
+        
+        def genlegtext(sample, els, comp, code, fom, fomfmt=fomfmt, compfmt=compfmt, legendcmd=legendcmd):
+            legstr=legendcmd[:]
+            for count, (n, ss) in enumerate(zip((fom, sample, code), ('<fom>', '<sample>', '<code>'))):
+                if n is None:
+                    legstr=legstr.replace(ss, '')
+                    continue
+                if count==0:
+                    s=fomfmt %n
+                else:
+                    s='%d' %n
+                legstr=legstr.replace(ss, s)
+            if 'd' in compfmt:
+                compstr=[compfmt %int(round(c*100.)) for c in comp]
+            else:
+                compstr=[compfmt %c for c in comp]
+            for l, ssl in zip([els, compstr], [['<A>', '<B>', '<C>', '<D>'], ['<a>', '<b>', '<c>', '<d>']]):
+                for s, ss in zip(l, ssl):
+                    legstr=legstr.replace(ss, s)
+            return legstr
+        self.genlegfcn=genlegtext
+        
 class filtersampleswidget(QDialog):
     def __init__(self, parent=None, title='', arr=None):
         super(filtersampleswidget, self).__init__(parent)
@@ -224,8 +295,31 @@ class visdataDialog(QDialog):
 #        self.xplotchoiceComboBox.setCurrentIndex(0)
 #        self.yplotchoiceComboBox.setCurrentIndex(1)
 #        
+
+        templab=QLabel()
+        templab.setText('x min,max')
+        self.xminmaxLineEdit=QLineEdit()
+        self.xminmaxLineEdit.setFixedWidth(140)
+        xminmaxlayout=QVBoxLayout()
+        xminmaxlayout.addWidget(templab)
+        xminmaxlayout.addWidget(self.xminmaxLineEdit)
+        
+        templab=QLabel()
+        templab.setText('y min,max')
+        self.yminmaxLineEdit=QLineEdit()
+        self.yminmaxLineEdit.setFixedWidth(140)
+        yminmaxlayout=QVBoxLayout()
+        yminmaxlayout.addWidget(templab)
+        yminmaxlayout.addWidget(self.yminmaxLineEdit)
+        
+        
         self.overlayselectCheckBox=QCheckBox()
         self.overlayselectCheckBox.setText("overlay on\n'select' plot")
+        
+        customxylegendPushButton=QPushButton()
+        customxylegendPushButton.setText("customize\nlegend")
+        QObject.connect(customxylegendPushButton, SIGNAL("pressed()"), self.getcustomlegendfcn)
+        self.customlegendfcn=lambda sample, els, comp, code, fom: `sample`
         
         self.fileLineEdit=QLineEdit()        
         self.fileLineEdit.setText('')
@@ -247,7 +341,7 @@ class visdataDialog(QDialog):
                 self.ternstackComboBox.insertItem(i, l)
         self.ternstackComboBox.setCurrentIndex(0)
         QObject.connect(self.ternstackComboBox,SIGNAL("activated(QString)"),self.setupcomppermute)
-        self.setupcomppermute(replot=False)
+        
         
         compLineEditLabel=QLabel()
         compLineEditLabel.setText('Composition:\n(as in a,b,c,d)')
@@ -269,6 +363,13 @@ class visdataDialog(QDialog):
         selectMap=QPushButton()
         selectMap.setText("select\nplatemap")
         QObject.connect(selectMap, SIGNAL("pressed()"), self.openPlateMap)
+        
+        
+        self.elsLineEdit=QLineEdit()        
+        self.elsLineEdit.setText('A,B,C,D')
+        elsLineEditLabel=QLabel()
+        elsLineEditLabel.setText('elements:')
+        QObject.connect(self.elsLineEdit,SIGNAL("textEdited"),self.setupcomppermute)
         
         selectFolder=QPushButton()
         selectFolder.setText("select\ndata folder")
@@ -343,7 +444,11 @@ class visdataDialog(QDialog):
             ctrllayout.addLayout(templayout, i, j)
         
         ctrllayout.addWidget(selectMap, 0, 1)
-        #ctrllayout.addWidget(savesampleButton, 0, 2) don't have save yet, just copy text
+        
+        elsLayout=QVBoxLayout()
+        elsLayout.addWidget(self.elsLineEdit)
+        elsLayout.addWidget(elsLineEditLabel)
+        ctrllayout.addLayout(elsLayout, 0, 2)
         ctrllayout.addWidget(selectFolder, 1, 1)
         ctrllayout.addWidget(ternstackComboBoxLabel, 2, 1)
         ctrllayout.addWidget(self.ternstackComboBox, 2, 2)
@@ -383,7 +488,10 @@ class visdataDialog(QDialog):
         xyctrllayout.addWidget(self.yplotchoiceComboBox)
         xyctrllayout.addWidget(xycolplotchoiceComboBoxLabel)
         xyctrllayout.addWidget(self.xycolplotchoiceComboBox)
+        xyctrllayout.addLayout(xminmaxlayout)
+        xyctrllayout.addLayout(yminmaxlayout)
         xyctrllayout.addWidget(self.overlayselectCheckBox)
+        xyctrllayout.addWidget(customxylegendPushButton)
         mainlayout.addLayout(xyctrllayout, 0, 4, 1, 1)
         mainlayout.addWidget(self.plotw_xy, 0, 5, 1, 1)
         
@@ -394,9 +502,10 @@ class visdataDialog(QDialog):
         self.quat=QuaternaryPlot(pylab.gca())
         
         self.setLayout(mainlayout)
-        self.resize(1600, 750)
+        self.resize(1700, 750)
         
         self.linefields=[('%d', 'Sample'), ('%.2f', 'x'), ('%.2f', 'y'), ('%.2f', 'A'), ('%.2f', 'B'), ('%.2f', 'C'), ('%.2f', 'D'), ('%d', 'code')]
+        self.setupcomppermute(replot=False)
         self.openPlateMap()
         #self.fom=None
         
@@ -411,7 +520,7 @@ class visdataDialog(QDialog):
                 testfcn=lambda arr:testfcn(arr)&(self.fom>=self.vmin)
             if self.skipoutofrange[1]:
                 testfcn=lambda arr:testfcn(arr)&(self.fom<=self.vmax)
-            inds=numpy.where(testfcn(self.fom))
+            inds=numpy.where(testfcn(self.fom))[0]
         
         #platemap plot
         self.plotw_plate.axes.cla()
@@ -440,16 +549,19 @@ class visdataDialog(QDialog):
         permcomp=self.comp[:, self.comppermuteinds]
         self.cbax_stack.cla()
         if self.fom is None:
-            fomcol=['k']*len(self.comp)
+            fomcol=['k']*len(permcomp)
             for i in self.sampleselectinds:
                 fomcol[i]='r'
             fomcol=numpy.array(fomcol)
-            self.stackplotfcn(permcomp, fomcol, self.plotw_stack_stpl, s=8, edgecolors='none')
+            inds2=numpy.where(numpy.abs(permcomp.sum(axis=1)-1.)<0.02)[0]
+            self.stackplotfcn(permcomp[inds2], fomcol[inds2], self.plotw_stack_stpl, s=8, edgecolors='none')
         else:
-            self.stackplotfcn(permcomp[inds], self.fom[inds], self.plotw_stack_stpl, s=8, edgecolors='none', cmap=self.cmap, norm=self.norm, cb=False)
+            inds_inds=numpy.where(numpy.abs(permcomp[inds].sum(axis=1)-1.)<0.02)[0]
+            inds2=inds[inds_inds]
+            self.stackplotfcn(permcomp[inds2], self.fom[inds2], self.plotw_stack_stpl, s=8, edgecolors='none', cmap=self.cmap, norm=self.norm, cb=False)
             
             sm=cm.ScalarMappable(norm=self.norm, cmap=self.cmap)
-            sm.set_array(self.fom[inds])
+            sm.set_array(self.fom[inds2])
             cb=self.plotw_stack.fig.colorbar(sm, cax=self.cbax_stack, extend=self.extend, format=autocolorbarformat((self.vmin, self.vmax)))
             
             #cb=self.plotw_stack.fig.colorbar(m, cax=self.cbax_plate, extend=self.extend))
@@ -562,19 +674,39 @@ class visdataDialog(QDialog):
                 if len(v)==self.rawlen:
                     plotdata[count]=v[self.rawselectinds]
                     
-        lab='%d' %d['sample_no']
-        self.plotw_xy.axes.plot(plotdata[0], plotdata[1], '.-', label=lab)
+        if self.fom is None:
+            selfom=None
+        else:
+            selfom=self.fom[self.selectind]
+        #lab='%d' %d['sample_no']***
+        code=self.platemapdlist[self.platemapindswithdata[self.selectind]]['code']
+        lab=self.customlegendfcn(d['sample_no'], self.ellabels, self.comp[self.selectind], code, selfom)
+        self.plotw_xy.axes.plot(plotdata[0], plotdata[1], '.-', label=lab, markeredgecolor='none')
         
         autotickformat(self.plotw_xy.axes, x=1, y=1)
 
         if (not plotillumkey is None) and plotillumkey in d.keys() and not overlaybool:
             illuminds=numpy.where(plotdata[2])[0]
-            self.plotw_xy.axes.plot(plotdata[0][illuminds], plotdata[1][illuminds], 'y.')
+            self.plotw_xy.axes.plot(plotdata[0][illuminds], plotdata[1][illuminds], 'y.', markeredgecolor='none')
         self.plotw_xy.axes.set_xlabel(xk)
         self.plotw_xy.axes.set_ylabel(yk)
         leg=self.plotw_xy.axes.legend(loc=0)
         leg.draggable()
+        
+        for le, fcn in zip([self.xminmaxLineEdit, self.yminmaxLineEdit], [self.plotw_xy.axes.set_xlim, self.plotw_xy.axes.set_ylim]):
+            vstr=str(le.text()).strip()
+            if len(vstr)==0:
+                continue
+            try:
+                a, b, c=vstr.partition(',')
+                a=myeval(a.strip())
+                c=myeval(c.strip())
+                fcn(a, c)
+            except:
+                print 'problem with setting axes limits: ', vstr
+                continue
         self.plotw_xy.fig.canvas.draw()
+        
     def sampleline_ind(self):
         plated=self.platemapdlist[self.platemapindswithdata[self.selectind]]
         s='\t'.join([fmtstr %plated[k] for fmtstr, k in self.linefields])
@@ -592,8 +724,13 @@ class visdataDialog(QDialog):
             self.plot()#would be nice to only have to plot overlay of selected samples
     
     def setupcomppermute(self, replot=True):
+        elstrlist=str(self.elsLineEdit.text()).strip().split(',')
+        elstrlist=[s.strip() for s in elstrlist]
+        if len(elstrlist)<4:
+            elstrlist=elstrlist+['A', 'B', 'C', 'D'][len(elstrlist):]
+        elstrlist=elstrlist*2#for permute
         i=self.ternstackComboBox.currentIndex()
-        self.ellabels=['A', 'B', 'C', 'D', 'A', 'B', 'C'][i:i+4]
+        self.ellabels=elstrlist[i:i+4]
         self.comppermuteinds=[0, 1, 2, 3, 0, 1, 2][i:i+4]
         if replot:
             self.stackedplotsetup()
@@ -649,6 +786,7 @@ class visdataDialog(QDialog):
     def openDataFolder(self):
         #p='C:/Users/Gregoire/Documents/demodata/v2'
         p=mygetdir(parent=self, markstr='select folder with .pck files')
+        #p='C:/Users/Gregoire/Documents/CaltechWork/echemuvvis/photoanodes/temp'
         if p is None or p=='':
             return
         self.folderLineEdit.setText(p)
@@ -753,6 +891,8 @@ class visdataDialog(QDialog):
                 continue
 #here the platemap is sorted to the data 
         
+        self.allfomkeys.sort()
+        self.allarrkeys.sort()
         for sortkey in ['Wavelength(nm)', 't(s)']:
             if sortkey in self.allarrkeys:
                 self.allarrkeys=[self.allarrkeys.pop(self.allarrkeys.index(sortkey))]+self.allarrkeys
@@ -792,6 +932,8 @@ class visdataDialog(QDialog):
     def openPlateMap(self):
         p=mygetopenfile(parent=self, markstr='select platemap .txt')
         #p='C:/Users/Gregoire/Documents/CaltechWork/platemaps/0037-04-0730-mp.txt'
+        #p='C:/Users/Gregoire/Documents/CaltechWork/platemaps/0044-04-0820-mp.txt'
+        
         if p is None or p=='':
             return
         self.fileLineEdit.setText(p)
@@ -807,7 +949,18 @@ class visdataDialog(QDialog):
                 print 'error filtering by codes ', codesstr
         for d in self.platemapdlist:
             d['comp']=numpy.array([d[k] for k in ['A', 'B', 'C', 'D']])
-            d['col']=self.quat.rgb_comp([d['comp']])[0]
+            if d['comp'].sum()==0:
+                col=numpy.array([.9, .9, .9])
+            elif d['comp'].sum()!=1.:
+                frac=d['comp'].sum()
+                d['comp']/=frac
+                
+                col=self.quat.rgb_comp([d['comp']])[0]
+#                if frac<1:
+#                    col=self.quat.rgb_comp([d['comp']])[0]*frac
+            else:
+                col=self.quat.rgb_comp([d['comp']])[0]
+            d['col']=col
             
         self.platemapsmplist=self.extractlist_dlistkey('Sample')
         
@@ -890,7 +1043,13 @@ class visdataDialog(QDialog):
         for count, i in enumerate(filtsmpswidget.selectinds):
             self.selectind=i
             self.addtoselectsamples(plot=(count==lastind))
-            
+    
+    def getcustomlegendfcn(self):
+        widg=legendformatwidget(self.parent, arr=self.fom)
+        widg.exec_()
+        self.customlegendfcn=widg.genlegfcn
+        
+        
     def addValuesSample(self, remove=False):
         sampleNostr = str(self.sampleLineEdit.text())
 
