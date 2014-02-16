@@ -105,10 +105,12 @@ class filtersampleswidget(QDialog):
         templab2.setText('max FOM')
         self.vmaxLineEdit=QLineEdit()
         
+        
         mainlayout.addWidget(templab, 3, 0)
         mainlayout.addWidget(self.vminLineEdit, 3, 1)
         mainlayout.addWidget(templab2, 4, 0)
         mainlayout.addWidget(self.vmaxLineEdit, 4, 1)
+        
         
         self.buttonBox = QDialogButtonBox(self)
         self.buttonBox.setGeometry(QRect(520, 195, 160, 26))
@@ -154,13 +156,15 @@ class filtersampleswidget(QDialog):
             self.selectinds+=list(numpy.where(self.arr>=maxval)[0])
         
 class fomplotoptions(QDialog):
-    def __init__(self, parent=None, vmin=0, vmax=1, rev_cols=None, title=''):
+    def __init__(self, parent=None, vmin=0, vmax=1, rev_cols=None, fomkey='', fommultstr='1.', title=''):
         super(fomplotoptions, self).__init__(parent)
         self.parent=parent
         
         self.revcmapCheckBox=QCheckBox()
         self.revcmapCheckBox.setText('reverse cmap?')
         
+        self.fommultstr=fommultstr
+        self.fomkey=fomkey
         
         templab=QLabel()
         templab.setText('min,max colorbar')
@@ -197,6 +201,24 @@ class fomplotoptions(QDialog):
         mainlayout.addLayout(vminmaxlayout, 0, 1)
         mainlayout.addLayout(outrangecollayout, 0, 2)
         
+        templab3=QLabel()
+        templab3.setText('FOM label')
+        self.fomkeyLineEdit=QLineEdit()
+        self.fomkeyLineEdit.setText(fomkey)
+        
+        templab4=QLabel()
+        templab4.setText('FOM multiplier')
+        self.fommultLineEdit=QLineEdit()
+        self.fommultLineEdit.setText(fommultstr)
+
+        fomkeyLayout=QVBoxLayout()
+        fomkeyLayout.addWidget(templab3)
+        fomkeyLayout.addWidget(self.fomkeyLineEdit)
+        fommultLayout=QVBoxLayout()
+        fommultLayout.addWidget(templab4)
+        fommultLayout.addWidget(self.fommultLineEdit)
+        mainlayout.addLayout(fomkeyLayout, 1, 0, 1, 2)
+        mainlayout.addLayout(fommultLayout, 1, 2, 1, 2)
 
         self.buttonBox = QDialogButtonBox(self)
         self.buttonBox.setGeometry(QRect(520, 195, 160, 26))
@@ -204,7 +226,7 @@ class fomplotoptions(QDialog):
         self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Ok)
         QObject.connect(self.buttonBox, SIGNAL("accepted()"), self.accept)
         QObject.connect(self.buttonBox, SIGNAL("rejected()"), self.reject)
-        mainlayout.addWidget(self.buttonBox, 1, 0, 1, 3)
+        mainlayout.addWidget(self.buttonBox, 2, 0, 1, 3)
     
         QObject.connect(self.buttonBox,SIGNAL("accepted()"),self.ExitRoutine)
         #QObject.connect(self.buttonBox,SIGNAL("rejected()"),self.ExitRoutineCancel)
@@ -226,8 +248,12 @@ class fomplotoptions(QDialog):
         self.skipoutofrange=[False, False]
         
         vstr=str(self.vminmaxLineEdit.text()).strip()
+        self.fomkey=str(self.fomkeyLineEdit.text()).strip()
+        self.fommultstr=str(self.fommultLineEdit.text()).strip()
         
+            
         try:
+            self.fommult=myeval(self.fommultstr)
             a, b, c=vstr.partition(',')
             a=myeval(a.strip())
             c=myeval(c.strip())
@@ -667,12 +693,13 @@ class visdataDialog(QDialog):
             else:
                 plotdata+=[dfile['intermediate_arrays'][k]]
         
+
         #if all raw len then leave but if some interlen then take the rawlen and index down to interlen
         minlen=min([len(v) for v in plotdata])
-        if minlen!=self.rawlen:
+        if minlen!=d['rawlen']:
             for count, v in enumerate(plotdata):
-                if len(v)==self.rawlen:
-                    plotdata[count]=v[self.rawselectinds]
+                if len(v)==d['rawlen']:
+                    plotdata[count]=v[d['rawselectinds']]
                     
         if self.fom is None:
             selfom=None
@@ -782,10 +809,34 @@ class visdataDialog(QDialog):
             return [d[k] for k in keys]
         except:
             return None
+    
+    def initprepnewdatafile(self, smp):
+        smp=int(round(smp))
+        if smp in self.smplist:
+            ind=self.smplist.index(smp)
+            d=self.datadlist[ind]
+        else:
+            d={}
+            d['sample_no']=smp
+            i=self.platemapsmplist.index(smp)
+            d['platemapind']=i
+            d['p']=''#this path only used for reading arrays from disc so only put a path here if necesasary
+            d['rawkeys']=[]
+            d['raw_arrays']={}
+            d['interkeys']=[]
+            d['fomd']={}
+            d['fomkeys']=[]
+            d['rawlen']=None
+            self.platemapindswithdata+=[i]
+            self.smplist+=[smp]
+            self.datadlist+=[d]
+
             
+        return d #d passed by reference 
+        
     def openDataFolder(self):
         #p='C:/Users/Gregoire/Documents/demodata/v2'
-        p=mygetdir(parent=self, markstr='select folder with .pck files')
+        p=mygetdir(parent=self, markstr='select folder with .pck files and/or .txt,.opt,.smp ascii files')
         #p='C:/Users/Gregoire/Documents/CaltechWork/echemuvvis/photoanodes/temp'
         if p is None or p=='':
             return
@@ -809,40 +860,30 @@ class visdataDialog(QDialog):
                     for count, smp in enumerate(dtxt[smpk]):
                         if not smp in self.platemapsmplist:
                             continue
-                        d={}
-                        d['sample_no']=smp
-                        i=self.platemapsmplist.index(smp)
-                        self.platemapindswithdata+=[i]
-                        self.smplist+=[smp]
-                        d['platemapind']=i
-                        d['p']=p2
-                        d['rawkeys']=[]
-                        d['raw_arrays']=None
-                        d['interkeys']=[]
-                        d['fomd']=dict([(k, v[count]) for k, v in dtxt.iteritems()])
-                        d['fomkeys']=dtxt.keys()
+                        d=self.initprepnewdatafile(smp)
+                        for k, v in dtxt.iteritems():
+                            d['fomd'][k]=v[count]
+                            d['fomkeys']+=[k]
                         self.allfomkeys+=[k for k in d['fomkeys'] if not k in self.allfomkeys]
-                        self.allarrkeys+=[k for k in d['rawkeys']+d['interkeys'] if not k in self.allarrkeys]
-                        self.datadlist+=[d]
+                        
                 else:#raw data txt file, 1 sample
                     if not smp in self.platemapsmplist:
                         continue
-                    d={}
-                    d['sample_no']=smp
-                    i=self.platemapsmplist.index(smp)
-                    self.platemapindswithdata+=[i]
-                    self.smplist+=[smp]
-                    d['platemapind']=i
-                    d['p']=p2
-                    d['rawkeys']=dtxt.keys()
-                    d['raw_arrays']=copy.copy(dtxt)
-                    self.rawlen=len(dtxt[dtxt.keys()[0]])
-                    d['interkeys']=[]
-                    d['fomd']={}
-                    d['fomkeys']=[]
-                    self.allfomkeys+=[k for k in d['fomkeys'] if not k in self.allfomkeys]
-                    self.allarrkeys+=[k for k in d['rawkeys']+d['interkeys'] if not k in self.allarrkeys]
-                    self.datadlist+=[d]
+                        
+                    d=self.initprepnewdatafile(smp)
+                    if d['rawlen'] is None:
+                        d['rawlen']=len(dtxt[dtxt.keys()[0]])
+                    elif d['rawlen']!=len(dtxt[dtxt.keys()[0]]):# there was already a fiel ready previously that set the rawlen and this is incompatible
+                        print 'skipping raw on ', p2, 'because wrong rawlen'
+                        continue
+                    
+                    if not d['raw_arrays'] is None:
+                        for k, v in dtxt.iteritems():
+                            d['raw_arrays'][k]=v
+                            d['rawkeys']+=[k]
+                    
+                    self.allarrkeys+=[k for k in d['rawkeys'] if not k in self.allarrkeys]
+
             elif fn.endswith('.pck'):#from here on out, pck file = 1 sample with both arrays and fom, must have rawd with an array inside
                 
                 p2=os.path.join(p, fn)
@@ -858,35 +899,38 @@ class visdataDialog(QDialog):
                     continue
                 smp=temp[0]
                 infod['sample_no']=smp
-                i=self.platemapsmplist.index(smp)
-                self.platemapindswithdata+=[i]
-                self.smplist+=[smp]
-                d={}
+                
+                d=self.initprepnewdatafile(smp)
+
                 for k, v in infod.iteritems():
                     d[k]=v
-                d['platemapind']=i
-                d['p']=p2
+                for k, v in fomd.iteritems():
+                    d['fomd'][k]=v
+                    d['fomkeys']+=[k]
+                self.allfomkeys+=[k for k in d['fomkeys'] if not k in self.allfomkeys]
+                
+                d['p']=p2#this path used to eread arrays on the fly later
+                
                 for v in rawd.itervalues():
                     if isinstance(v, numpy.ndarray) and v.ndim==1:
-                        self.rawlen=len(v)
+                        rl=len(v)
                         break
-                d['rawkeys']=[k for k, v in rawd.iteritems() if isinstance(v, numpy.ndarray) and len(v)==self.rawlen]
-                d['raw_arrays']=None
-                if 'rawselectinds' in interd.keys():
-                    self.interlen=len(interd['rawselectinds'])
-                    self.rawselectinds=interd['rawselectinds']
-                else:
-                    self.interlen=self.rawlen
-                    self.rawselectinds=range(self.rawlen)
-                d['interkeys']=[k for k, v in interd.iteritems() if isinstance(v, numpy.ndarray) and (len(v)==self.interlen or len(v)==self.rawlen)]
-                #don't filter fom keys, assume the values are scalars
-                d['fomd']=fomd
-                d['fomkeys']=fomd.keys()
                 
+                if d['rawlen'] is None:
+                    d['rawlen']=rl
+                    d['interlen']=rl
+                elif d['rawlen']!=rl: #got the fom's added but rawlen was set by somethign previous and this isn't it. could allow inter but too copmlicated
+                    print 'skipping raw/inter on ', p2, 'because wrong rawlen'
+                    continue
+                d['rawkeys']+=[k for k, v in rawd.iteritems() if isinstance(v, numpy.ndarray) and len(v)==d['rawlen']]
+                d['raw_arrays']=None#triggers read array on fly later
+                if 'rawselectinds' in interd.keys():
+                    d['interlen']=len(interd['rawselectinds'])
+                    d['rawselectinds']=interd['rawselectinds']
 
-                self.allfomkeys+=[k for k in d['fomkeys'] if not k in self.allfomkeys]
+                d['interkeys']+=[k for k, v in interd.iteritems() if isinstance(v, numpy.ndarray) and (len(v)==d['interlen'] or len(v)==d['rawlen'])]
+                #don't filter fom keys, assume the values are scalars
                 self.allarrkeys+=[k for k in d['rawkeys']+d['interkeys'] if not k in self.allarrkeys]
-                self.datadlist+=[d]
             else:
                 continue
 #here the platemap is sorted to the data 
@@ -933,7 +977,7 @@ class visdataDialog(QDialog):
         p=mygetopenfile(parent=self, markstr='select platemap .txt')
         #p='C:/Users/Gregoire/Documents/CaltechWork/platemaps/0037-04-0730-mp.txt'
         #p='C:/Users/Gregoire/Documents/CaltechWork/platemaps/0044-04-0820-mp.txt'
-        
+        #p='C:/Users/Gregoire/Documents/CaltechWork/platemaps/0028-04-0710-mp.txt'
         if p is None or p=='':
             return
         self.fileLineEdit.setText(p)
@@ -996,25 +1040,31 @@ class visdataDialog(QDialog):
                 self.plot()
         else:
             k=str(self.fomComboBox.currentText())
-            self.fom=numpy.array([(k in d['fomd'].keys() and (d['fomd'][k],) or (numpy.nan,))[0] for d in self.datadlist])
+            self.fomraw=numpy.array([(k in d['fomd'].keys() and (d['fomd'][k],) or (numpy.nan,))[0] for d in self.datadlist])
+            self.fom=copy.copy(self.fomraw)
             self.fomkey=k
+            self.fommultstr='1.'
             fomnotnan=self.fom[numpy.logical_not(numpy.isnan(self.fom))]
             self.vmin=fomnotnan.min()
             self.vmax=fomnotnan.max()
             self.rev_cols=None
             self.editfomopts(dflt=True)
+            
         
 
     def editfomopts(self, dflt=False):
         if self.fom is None:
             return
         if not dflt:
-            fomoptswidget=fomplotoptions(self.parent, vmin=self.vmin, vmax=self.vmax, rev_cols=self.rev_cols)
+            fomoptswidget=fomplotoptions(self.parent, vmin=self.vmin, vmax=self.vmax, rev_cols=self.rev_cols, fomkey=self.fomkey, fommultstr=self.fommultstr)
             fomoptswidget.exec_()
             self.rev_cols=fomoptswidget.rev_cols
             self.vmin=fomoptswidget.vmin
             self.vmax=fomoptswidget.vmax
             self.cmap=fomoptswidget.cmap
+            self.fomkey=fomoptswidget.fomkey
+            self.fommultstr=fomoptswidget.fommultstr
+            self.fom=self.fomraw*fomoptswidget.fommult
         if dflt or fomoptswidget.error:
             self.cmap=cm.jet
             self.skipoutofrange=[False, False]
