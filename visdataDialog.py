@@ -1,5 +1,5 @@
 from readtxt import smp_dict_generaltxt
-
+from csvfilewriter import createcsvfilstr
 from visualize_ui import *
 import copy
 #fom file import not tested
@@ -395,11 +395,15 @@ class visdataDialog(QDialog):
         self.elsLineEdit.setText('A,B,C,D')
         elsLineEditLabel=QLabel()
         elsLineEditLabel.setText('elements:')
-        QObject.connect(self.elsLineEdit,SIGNAL("textEdited"),self.setupcomppermute)
+        QObject.connect(self.elsLineEdit,SIGNAL("editingFinished()"),self.setupcomppermute)
         
         selectFolder=QPushButton()
         selectFolder.setText("select\ndata folder")
         QObject.connect(selectFolder, SIGNAL("pressed()"), self.openDataFolder)
+        
+        savecsvPushButton=QPushButton()
+        savecsvPushButton.setText("save FOM\n.csv file")
+        QObject.connect(savecsvPushButton, SIGNAL("pressed()"), self.savefomcsv)
         
         self.codesLineEdit=QLineEdit()        
         self.codesLineEdit.setText('')
@@ -472,9 +476,11 @@ class visdataDialog(QDialog):
         ctrllayout.addWidget(selectMap, 0, 1)
         
         elsLayout=QVBoxLayout()
-        elsLayout.addWidget(self.elsLineEdit)
         elsLayout.addWidget(elsLineEditLabel)
-        ctrllayout.addLayout(elsLayout, 0, 2)
+        elsLayout.addWidget(self.elsLineEdit)
+        
+        ctrllayout.addWidget(savecsvPushButton, 0, 2)
+        ctrllayout.addLayout(elsLayout, 1, 2)
         ctrllayout.addWidget(selectFolder, 1, 1)
         ctrllayout.addWidget(ternstackComboBoxLabel, 2, 1)
         ctrllayout.addWidget(self.ternstackComboBox, 2, 2)
@@ -707,7 +713,7 @@ class visdataDialog(QDialog):
             selfom=self.fom[self.selectind]
         #lab='%d' %d['sample_no']***
         code=self.platemapdlist[self.platemapindswithdata[self.selectind]]['code']
-        lab=self.customlegendfcn(d['sample_no'], self.ellabels, self.comp[self.selectind], code, selfom)
+        lab=self.customlegendfcn(d['sample_no'], self.ellabels, self.comp[self.selectind][self.comppermuteinds], code, selfom)
         self.plotw_xy.axes.plot(plotdata[0], plotdata[1], '.-', label=lab, markeredgecolor='none')
         
         autotickformat(self.plotw_xy.axes, x=1, y=1)
@@ -836,7 +842,7 @@ class visdataDialog(QDialog):
         
     def openDataFolder(self):
         #p='C:/Users/Gregoire/Documents/demodata/v2'
-        p=mygetdir(parent=self, markstr='select folder with .pck files and/or .txt,.opt,.smp ascii files')
+        p=mygetdir(parent=self, markstr='select folder with .pck files and/or .txt,.opt,.smp,.csv ascii files')
         #p='C:/Users/Gregoire/Documents/CaltechWork/echemuvvis/photoanodes/temp'
         if p is None or p=='':
             return
@@ -847,9 +853,13 @@ class visdataDialog(QDialog):
         self.allarrkeys=[]
         self.datadlist=[]
         for fn in os.listdir(p):
-            if fn.endswith('.txt') or fn.endswith('.opt') or fn.endswith('.smp'):
+            if fn.endswith('.txt') or fn.endswith('.opt') or fn.endswith('.smp') or fn.endswith('.csv'):
+                if fn.endswith('.csv'):
+                    delim=','
+                else:
+                    delim='\t'
                 p2=os.path.join(p, fn)
-                smp, dtxt=smp_dict_generaltxt(p2)
+                smp, dtxt=smp_dict_generaltxt(p2, delim=delim)
                 #forcerror
                 if smp is None:#FOM txt file, no array but many samples and foms
                     smpk=[k for k in ['sample_no', 'Sample No', 'Sample'] if k in dtxt.keys()]
@@ -1040,7 +1050,11 @@ class visdataDialog(QDialog):
                 self.plot()
         else:
             k=str(self.fomComboBox.currentText())
-            self.fomraw=numpy.array([(k in d['fomd'].keys() and (d['fomd'][k],) or (numpy.nan,))[0] for d in self.datadlist])
+            temp=numpy.array([(k in d['fomd'].keys() and (d['fomd'][k],) or (numpy.nan,))[0] for d in self.datadlist])
+            if numpy.all(numpy.isnan(temp)):
+                print k, ' is NaN for every sample. Cannot load that FOM'
+                return
+            self.fomraw=temp
             self.fom=copy.copy(self.fomraw)
             self.fomkey=k
             self.fommultstr='1.'
@@ -1211,7 +1225,21 @@ class visdataDialog(QDialog):
         f.write(savestr)
         f.close()
         
+    def savefomcsv(self, p=None):
+        if len(self.datadlist)==0 or len(self.allfomkeys)==0:
+            print 'no data to save'
+            return
 
+        if p is None:
+            p=mygetsavefile(parent=self, markstr='save .csv fom file', filename='.csv' )
+        if not p:
+            print 'save aborted'
+            return
+        savestr=createcsvfilstr(self.datadlist, self.allfomkeys)
+        f=open(p, mode='w')
+        f.write(savestr)
+        f.close()
+        
 class MainMenu(QMainWindow):
     def __init__(self, previousmm, execute=True, **kwargs):#, TreeWidg):
         super(MainMenu, self).__init__(None)

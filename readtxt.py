@@ -1,6 +1,6 @@
 import os.path, numpy
 #sample number can be provided as "Sample####_*"  in filename or in header
-def smp_dict_generaltxt(path): # can have raw data files with UV-vis or ECHE styles or a fom file with column headings as first line, in which case smp=None
+def smp_dict_generaltxt(path, delim='\t'): # can have raw data files with UV-vis or ECHE styles or a fom file with column headings as first line, in which case smp=None
     smp=None
     fn=os.path.split(path)[1]
     if fn.startswith('Sample'):
@@ -17,32 +17,45 @@ def smp_dict_generaltxt(path): # can have raw data files with UV-vis or ECHE sty
     f=open(path, mode='r')
     lines=f.readlines()
     f.close()
-    if lines[0].startswith('%'):
+    if lines[0].startswith('%'):#for echem data files
         for count, l in enumerate(lines):
             if l.startswith('%column_headings='):
                 chs=l.partition('%column_headings=')[2]
                 firstdatalineind=count+1
                 break
-    elif lines[0][0].isdigit():
-        numheadlines=lines[0].rpartition('\t')[2].strip()
+    elif lines[0][0].isdigit():#for uv-vis data files
+        numheadlines=lines[0].rpartition(delim)[2].strip()
         try:
             numheadlines=eval(numheadlines)
         except:
             return None, {}
         chs=lines[numheadlines+1].strip()
         firstdatalineind=numheadlines+2
-    elif lines[1][0].isdigit():
+    elif lines[1][0].isdigit():#fom files or any file with first line headings and second line starts values
         chs=lines[0].strip()
         firstdatalineind=1
+    elif lines[0][0]=='#':#for csv or anything with header noted by #
+        for count, l in enumerate(lines):
+            if l[0]!='#':
+                break
+        if lines[count][0].isdigit():# if column headings in last header line
+            chs=lines[count-1][1:].strip()
+            firstdatalineind=count
+        else:#if column headings line doesn't start with #
+            if not lines[count+1][0].isdigit():#but if the next line isn't data then abort
+                return None, {}
+            firstdatalineind=count+1
+            chs=lines[count].strip()
     else:
         return None, {}
     
     
     d={}
     z=[]
-    column_headings=chs.split('\t')
+    column_headings=chs.split(delim)
     column_headings=[s.strip() for s in column_headings]
-    z=[map(float, l.split('\t')) for l in lines[firstdatalineind:]]
+    myfloatfcn=lambda s:(len(s.strip())==0 and (float('NaN'),) or (float(s.strip()),))[0]#this turns emtpy string into NaN. given the .strip this only "works" if delimeter is not whitespace, e.g. csv
+    z=[map(myfloatfcn, l.split(delim)) for l in lines[firstdatalineind:]]
     for k, arr in zip(column_headings, numpy.float32(z).T):
         d[k]=arr
     return smp, d
