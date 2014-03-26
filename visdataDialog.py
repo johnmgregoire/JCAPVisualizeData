@@ -1,5 +1,5 @@
 from readtxt import smp_dict_generaltxt
-from csvfilewriter import createcsvfilstr
+from csvfilewriter import createcsvfilstr, selectexportfom
 from visualize_ui import *
 import copy
 #fom file import not tested
@@ -76,10 +76,10 @@ class legendformatwidget(QDialog):
         self.genlegfcn=genlegtext
         
 class filtersampleswidget(QDialog):
-    def __init__(self, parent=None, title='', arr=None):
+    def __init__(self, parent=None, title='', arr=None, minval=None, maxval=None, minmaxfmt='%.2e'):
         super(filtersampleswidget, self).__init__(parent)
         self.parent=parent
-        
+        self.setWindowTitle(title)
         self.arr=arr
         
         self.selectbelowCheckBox=QCheckBox()
@@ -87,6 +87,7 @@ class filtersampleswidget(QDialog):
         
         self.selectbetweenCheckBox=QCheckBox()
         self.selectbetweenCheckBox.setText("[min,max)")
+        self.selectbetweenCheckBox.setChecked(True)
         
         self.selectaboveCheckBox=QCheckBox()
         self.selectaboveCheckBox.setText("[max,INF)")
@@ -100,11 +101,14 @@ class filtersampleswidget(QDialog):
         templab=QLabel()
         templab.setText('min FOM')
         self.vminLineEdit=QLineEdit()
+        if not minval is None:
+            self.vminLineEdit.setText(minmaxfmt %minval)
         
         templab2=QLabel()
         templab2.setText('max FOM')
         self.vmaxLineEdit=QLineEdit()
-        
+        if not maxval is None:
+            self.vmaxLineEdit.setText(minmaxfmt %maxval)
         
         mainlayout.addWidget(templab, 3, 0)
         mainlayout.addWidget(self.vminLineEdit, 3, 1)
@@ -670,62 +674,72 @@ class visdataDialog(QDialog):
             self.plotw_xy.axes.cla()
         xk=str(self.xplotchoiceComboBox.currentText())
         yk=str(self.yplotchoiceComboBox.currentText())
-        if self.xycolplotchoiceComboBox.currentIndex()==0:
-            plotillumkey=None
-        else:
-            plotillumkey=str(self.xycolplotchoiceComboBox.currentText())
-        d=self.datadlist[self.selectind]
-        
-        for k in [xk, yk, plotillumkey]:#loop through to check before reading file
-            if k is None:
-                continue
-            if not k in (d['rawkeys']+d['interkeys']):
-                print 'aborting because data key not available for this sample: ', k
+        if self.plotselect_usefombool:
+            if self.xplotchoiceComboBox.currentIndex()==0 or self.yplotchoiceComboBox.currentIndex()==0:
                 return
-
-        if d['raw_arrays'] is None:#open pck 
-            f=open(d['p'], mode='r')
-            dfile=pickle.load(f)
-            f.close()
-        else:#arrays already story in d
-            dfile=d
-        
-        plotdata=[]
-        for k in [xk, yk, plotillumkey]:
-            if k is None:
-                continue
-            if k in d['rawkeys']:
-                plotdata+=[dfile['raw_arrays'][k]]
-            else:
-                plotdata+=[dfile['intermediate_arrays'][k]]
-        
-
-        #if all raw len then leave but if some interlen then take the rawlen and index down to interlen
-        minlen=min([len(v) for v in plotdata])
-        if minlen!=d['rawlen']:
-            for count, v in enumerate(plotdata):
-                if len(v)==d['rawlen']:
-                    plotdata[count]=v[d['rawselectinds']]
-                    
-        if self.fom is None:
-            selfom=None
+            plotfom_xy=[[d['fomd'][xk], d['fomd'][yk]] for d in self.datadlist if xk in d['fomd'].keys() and yk in d['fomd'].keys() and not numpy.isnan(d['fomd'][xk]*d['fomd'][yk])]
+            if len(plotfom_xy)==0:
+                return
+            fomx, fomy=numpy.array(plotfom_xy).T
+            self.plotw_xy.axes.plot(fomx, fomy, 'o',ms=2,mew=0)
         else:
-            selfom=self.fom[self.selectind]
-        #lab='%d' %d['sample_no']***
-        code=self.platemapdlist[self.platemapindswithdata[self.selectind]]['code']
-        lab=self.customlegendfcn(d['sample_no'], self.ellabels, self.comp[self.selectind][self.comppermuteinds], code, selfom)
-        self.plotw_xy.axes.plot(plotdata[0], plotdata[1], '.-', label=lab, markeredgecolor='none')
-        
-        autotickformat(self.plotw_xy.axes, x=1, y=1)
+            if self.xycolplotchoiceComboBox.currentIndex()==0:
+                plotillumkey=None
+            else:
+                plotillumkey=str(self.xycolplotchoiceComboBox.currentText())
+            d=self.datadlist[self.selectind]
+            
+            for k in [xk, yk, plotillumkey]:#loop through to check before reading file
+                if k is None:
+                    continue
+                if not k in (d['rawkeys']+d['interkeys']):
+                    print 'aborting because data key not available for this sample: ', k
+                    return
 
-        if (not plotillumkey is None) and plotillumkey in d.keys() and not overlaybool:
-            illuminds=numpy.where(plotdata[2])[0]
-            self.plotw_xy.axes.plot(plotdata[0][illuminds], plotdata[1][illuminds], 'y.', markeredgecolor='none')
+            if d['raw_arrays'] is None:#open pck 
+                f=open(d['p'], mode='r')
+                dfile=pickle.load(f)
+                f.close()
+            else:#arrays already story in d
+                dfile=d
+            
+            plotdata=[]
+            for k in [xk, yk, plotillumkey]:
+                if k is None:
+                    continue
+                if k in d['rawkeys']:
+                    plotdata+=[dfile['raw_arrays'][k]]
+                else:
+                    plotdata+=[dfile['intermediate_arrays'][k]]
+            
+
+            #if all raw len then leave but if some interlen then take the rawlen and index down to interlen
+            minlen=min([len(v) for v in plotdata])
+            if minlen!=d['rawlen']:
+                for count, v in enumerate(plotdata):
+                    if len(v)==d['rawlen']:
+                        plotdata[count]=v[d['rawselectinds']]
+                        
+            if self.fom is None:
+                selfom=None
+            else:
+                selfom=self.fom[self.selectind]
+            #lab='%d' %d['sample_no']***
+            code=self.platemapdlist[self.platemapindswithdata[self.selectind]]['code']
+            lab=self.customlegendfcn(d['sample_no'], self.ellabels, self.comp[self.selectind][self.comppermuteinds], code, selfom)
+            self.plotw_xy.axes.plot(plotdata[0], plotdata[1], '.-', label=lab, markeredgecolor='none')
+            
+            autotickformat(self.plotw_xy.axes, x=1, y=1)
+
+            if (not plotillumkey is None) and plotillumkey in d.keys() and not overlaybool:
+                illuminds=numpy.where(plotdata[2])[0]
+                self.plotw_xy.axes.plot(plotdata[0][illuminds], plotdata[1][illuminds], 'y.', markeredgecolor='none')
+            
+            leg=self.plotw_xy.axes.legend(loc=0)
+            leg.draggable()
+        
         self.plotw_xy.axes.set_xlabel(xk)
         self.plotw_xy.axes.set_ylabel(yk)
-        leg=self.plotw_xy.axes.legend(loc=0)
-        leg.draggable()
-        
         for le, fcn in zip([self.xminmaxLineEdit, self.yminmaxLineEdit], [self.plotw_xy.axes.set_xlim, self.plotw_xy.axes.set_ylim]):
             vstr=str(le.text()).strip()
             if len(vstr)==0:
@@ -965,20 +979,30 @@ class visdataDialog(QDialog):
         self.xycolplotchoiceComboBox.clear()
         
         self.xycolplotchoiceComboBox.insertItem(0, 'none')
-        
-        for count, k in enumerate(self.allarrkeys):
-            self.xplotchoiceComboBox.insertItem(count, k)
-            self.yplotchoiceComboBox.insertItem(count, k)
-            self.xycolplotchoiceComboBox.insertItem(count+1, k)
-        
-        if len(self.allarrkeys)>0:
+        self.xycolplotchoiceComboBox.setCurrentIndex(0)
+        self.plotselect_usefombool=len(self.allarrkeys)==0
+        if self.plotselect_usefombool:
+            self.xplotchoiceComboBox.insertItem(0, 'none')
+            self.yplotchoiceComboBox.insertItem(0, 'none')
             self.xplotchoiceComboBox.setCurrentIndex(0)
-        if len(self.allarrkeys)>1:
-            self.yplotchoiceComboBox.setCurrentIndex(1)
-        if 'Toggle' in self.allarrkeys:
-            self.xycolplotchoiceComboBox.setCurrentIndex(self.allarrkeys.index('Toggle'))
+            self.yplotchoiceComboBox.setCurrentIndex(0)
+            for count, k in enumerate(self.allfomkeys):
+                self.xplotchoiceComboBox.insertItem(count+1, k)
+                self.yplotchoiceComboBox.insertItem(count+1, k)
         else:
-            self.xycolplotchoiceComboBox.setCurrentIndex(0)
+            for count, k in enumerate(self.allarrkeys):
+                self.xplotchoiceComboBox.insertItem(count, k)
+                self.yplotchoiceComboBox.insertItem(count, k)
+                self.xycolplotchoiceComboBox.insertItem(count+1, k)
+            
+            if len(self.allarrkeys)>0:
+                self.xplotchoiceComboBox.setCurrentIndex(0)
+            if len(self.allarrkeys)>1:
+                self.yplotchoiceComboBox.setCurrentIndex(1)
+            if 'Toggle' in self.allarrkeys:
+                self.xycolplotchoiceComboBox.setCurrentIndex(self.allarrkeys.index('Toggle'))
+            else:
+                self.xycolplotchoiceComboBox.setCurrentIndex(0)
         self.sampleselectinds=[] #this is actually platemap select inds of the  already parsed inds in self.platemapindswithdata
         self.selectsamplelines=[]
         self.fomcolorselected()
@@ -1100,11 +1124,22 @@ class visdataDialog(QDialog):
     
     def filtersmpbyfom(self):
         if self.fom is None:
-            return
-        filtsmpswidget=filtersampleswidget(self.parent, arr=self.fom)
-        filtsmpswidget.exec_()
-        lastind=(len(filtsmpswidget.selectinds)-1)
-        for count, i in enumerate(filtsmpswidget.selectinds):
+            if len(self.comp)==0:
+                return
+            selectinds=set(range(len(self.comp)))
+            for el, compind in zip(self.ellabels, self.comppermuteinds):
+                arr=self.comp[:, compind]
+                filtsmpswidget=filtersampleswidget(self.parent, title='filter for element %s' %el, arr=arr, minval=0., maxval=1.01, minmaxfmt='%.2f')
+                filtsmpswidget.exec_()
+                selectinds=selectinds.intersection(filtsmpswidget.selectinds)
+            selectinds=list(selectinds)
+            selectinds.sort()
+        else:
+            filtsmpswidget=filtersampleswidget(self.parent, title='filter for selected fom', arr=self.fom)
+            filtsmpswidget.exec_()
+            selectinds=filtsmpswidget.selectinds
+        lastind=len(selectinds)-1
+        for count, i in enumerate(selectinds):
             self.selectind=i
             self.addtoselectsamples(plot=(count==lastind))
     
@@ -1229,13 +1264,17 @@ class visdataDialog(QDialog):
         if len(self.datadlist)==0 or len(self.allfomkeys)==0:
             print 'no data to save'
             return
-
+        selkeyswidget=selectexportfom(self.parent,  self.allfomkeys)
+        if not selkeyswidget.exec_():
+            return
+        savestr=createcsvfilstr(self.datadlist, selkeyswidget.selectkeys)
+        
         if p is None:
             p=mygetsavefile(parent=self, markstr='save .csv fom file', filename='.csv' )
         if not p:
             print 'save aborted'
             return
-        savestr=createcsvfilstr(self.datadlist, self.allfomkeys)
+            
         f=open(p, mode='w')
         f.write(savestr)
         f.close()
