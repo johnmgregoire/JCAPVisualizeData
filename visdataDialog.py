@@ -2,10 +2,39 @@ from readtxt import smp_dict_generaltxt
 from csvfilewriter import createcsvfilstr, selectexportfom
 from visualize_ui import *
 import copy
+from quaternary_ternary_faces import ternaryfaces
 #fom file import not tested
 #doesn't expect more than 1 file per sample. in that case proabbly first one it fins is the one that gets auto-plotted with click but not sure
 
 
+class ternaryfacesWidget(QDialog):
+    def __init__(self, parent, comp, cols, cbaxrect=[.88, .2, .04, .6], ellabels=['A', 'B', 'C', 'D']):
+        super(ternaryfacesWidget, self).__init__(parent)
+        
+        mainlayout=QVBoxLayout()
+        
+        self.plotw=plotwidget(self, width=8, height=4)
+        self.plotw.fig.clf()
+        self.ax=self.plotw.fig.add_axes([.05, .05, .78, .9])#add_subplot(111)
+        if not cbaxrect is None:
+            self.cbax=self.plotw.fig.add_axes(cbaxrect)
+        
+        self.tf=ternaryfaces(self.ax, ellabels=ellabels, offset=.04)
+        self.tf.label(fontsize=16)
+        
+        mainlayout.addWidget(self.plotw)
+        
+        self.buttonBox = QDialogButtonBox(self)
+        self.buttonBox.setGeometry(QRect(520, 195, 160, 26))
+        self.buttonBox.setOrientation(Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Ok)
+        QObject.connect(self.buttonBox, SIGNAL("accepted()"), self.accept)
+        mainlayout.addWidget(self.buttonBox)
+        
+        self.setLayout(mainlayout)
+        
+        self.tf.scatter(comp, cols, s=20, edgecolors='none')
+        
 class legendformatwidget(QDialog):
     def __init__(self, parent=None, title='', arr=None):
         super(legendformatwidget, self).__init__(parent)
@@ -401,6 +430,10 @@ class visdataDialog(QDialog):
         elsLineEditLabel.setText('elements:')
         QObject.connect(self.elsLineEdit,SIGNAL("editingFinished()"),self.setupcomppermute)
         
+        ternfacesPushButton=QPushButton()
+        ternfacesPushButton.setText("open tern.\nfaces plot")
+        QObject.connect(ternfacesPushButton, SIGNAL("pressed()"), self.openternfacesplot)
+        
         selectFolder=QPushButton()
         selectFolder.setText("select\ndata folder")
         QObject.connect(selectFolder, SIGNAL("pressed()"), self.openDataFolder)
@@ -482,12 +515,20 @@ class visdataDialog(QDialog):
         elsLayout=QVBoxLayout()
         elsLayout.addWidget(elsLineEditLabel)
         elsLayout.addWidget(self.elsLineEdit)
+#        temp=QHBoxLayout()
+#        temp.addLayout(elsLayout)
+#        temp.addWidget(ternfacesPushButton)
+        temp=QHBoxLayout()
+        temp.addWidget(ternstackComboBoxLabel)
+        temp.addWidget(self.ternstackComboBox)
         
         ctrllayout.addWidget(savecsvPushButton, 0, 2)
         ctrllayout.addLayout(elsLayout, 1, 2)
         ctrllayout.addWidget(selectFolder, 1, 1)
-        ctrllayout.addWidget(ternstackComboBoxLabel, 2, 1)
-        ctrllayout.addWidget(self.ternstackComboBox, 2, 2)
+        ctrllayout.addWidget(ternfacesPushButton, 2, 1)
+        ctrllayout.addLayout(temp, 2, 2)
+        #ctrllayout.addWidget(ternstackComboBoxLabel, 2, 1)
+        #ctrllayout.addWidget(self.ternstackComboBox, 2, 2)
 
         ctrllayout.addWidget(addComp, 3, 1)
         ctrllayout.addWidget(remComp, 3, 2)
@@ -544,6 +585,7 @@ class visdataDialog(QDialog):
         self.setupcomppermute(replot=False)
         self.openPlateMap()
         #self.fom=None
+        self.ternfacesdata=None
         
     def extractlist_dlistkey(self, k):
         return [d[k] for d in self.platemapdlist]
@@ -591,6 +633,7 @@ class visdataDialog(QDialog):
             fomcol=numpy.array(fomcol)
             inds2=numpy.where(numpy.abs(permcomp.sum(axis=1)-1.)<0.02)[0]
             self.stackplotfcn(permcomp[inds2], fomcol[inds2], self.plotw_stack_stpl, s=8, edgecolors='none')
+            self.ternfacesdata=(permcomp[inds2], fomcol[inds2], None)
         else:
             inds_inds=numpy.where(numpy.abs(permcomp[inds].sum(axis=1)-1.)<0.02)[0]
             inds2=inds[inds_inds]
@@ -602,7 +645,9 @@ class visdataDialog(QDialog):
             
             #cb=self.plotw_stack.fig.colorbar(m, cax=self.cbax_plate, extend=self.extend))
             cb.set_label(self.fomkey, fontsize=18)
-        
+
+            self.ternfacesdata=(permcomp[inds2], self.fom[inds2], sm)
+            
         self.plotw_stack.fig.canvas.draw()
         #browser text
         headline='\t'.join([k for fmtstr, k in self.linefields]+self.allfomkeys)
@@ -610,8 +655,19 @@ class visdataDialog(QDialog):
         
         self.browser.setText(selectsamplesstr)
 
-    
-
+    def openternfacesplot(self):
+        if self.ternfacesdata is None:
+            print 'No data available for ternary faces plot'
+            return
+        comp, col, sm=self.ternfacesdata
+        tfwidget=ternaryfacesWidget(self.parent, comp, col, ellabels=self.ellabels)
+        
+        if not sm is None:
+            cb=tfwidget.plotw.fig.colorbar(sm, cax=tfwidget.cbax, extend=self.extend, format=autocolorbarformat((self.vmin, self.vmax)))
+            cb.set_label(self.fomkey, fontsize=18)
+        
+        tfwidget.exec_()
+        
     def plateclickprocess(self, coords_button_ax):
         if len(self.x)==0:
             return
