@@ -8,7 +8,7 @@ from quaternary_ternary_faces import ternaryfaces
 
 
 class ternaryfacesWidget(QDialog):
-    def __init__(self, parent, comp, cols, cbaxrect=[.88, .2, .04, .6], ellabels=['A', 'B', 'C', 'D']):
+    def __init__(self, parent, comp, cols, cbaxrect=[.88, .2, .04, .6], ellabels=['A', 'B', 'C', 'D'], **kwargs):
         super(ternaryfacesWidget, self).__init__(parent)
         
         mainlayout=QVBoxLayout()
@@ -33,7 +33,7 @@ class ternaryfacesWidget(QDialog):
         
         self.setLayout(mainlayout)
         
-        self.tf.scatter(comp, cols, s=20, edgecolors='none')
+        self.tf.scatter(comp, cols, s=20, edgecolors='none', **kwargs)
         
 class legendformatwidget(QDialog):
     def __init__(self, parent=None, title='', arr=None):
@@ -660,12 +660,14 @@ class visdataDialog(QDialog):
             print 'No data available for ternary faces plot'
             return
         comp, col, sm=self.ternfacesdata
-        tfwidget=ternaryfacesWidget(self.parent, comp, col, ellabels=self.ellabels)
+        
         
         if not sm is None:
+            tfwidget=ternaryfacesWidget(self.parent, comp, col, ellabels=self.ellabels, cmap=self.cmap, norm=self.norm)
             cb=tfwidget.plotw.fig.colorbar(sm, cax=tfwidget.cbax, extend=self.extend, format=autocolorbarformat((self.vmin, self.vmax)))
             cb.set_label(self.fomkey, fontsize=18)
-        
+        else:
+            tfwidget=ternaryfacesWidget(self.parent, comp, col, ellabels=self.ellabels)
         tfwidget.exec_()
         
     def plateclickprocess(self, coords_button_ax):

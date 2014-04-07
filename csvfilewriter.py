@@ -2,7 +2,7 @@ import numpy
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-def createcsvfilstr(datadlist, fomkeys, fmt='%.5e'):
+def createcsvfilstr(datadlist, fomkeys, fmt='%.5e'):#for each sample, if fom not available inserts NaN
     smparr=[d['sample_no'] for d in datadlist]
     fomarr_smps=numpy.array([[(k in d['fomd'].keys() and (d['fomd'][k],) or (numpy.nan,))[0] for k in fomkeys] for d in datadlist]) 
     lines=[','.join(['sample_no']+fomkeys)]

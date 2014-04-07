@@ -17,6 +17,8 @@ def smp_dict_generaltxt(path, delim='\t'): # can have raw data files with UV-vis
     f=open(path, mode='r')
     lines=f.readlines()
     f.close()
+    if len(lines)==0:
+        return None, {}
     if lines[0].startswith('%'):#for echem data files
         for count, l in enumerate(lines):
             if l.startswith('%column_headings='):
