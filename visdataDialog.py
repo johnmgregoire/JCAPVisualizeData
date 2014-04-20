@@ -3,6 +3,7 @@ from csvfilewriter import createcsvfilstr, selectexportfom
 from visualize_ui import *
 import copy
 from quaternary_ternary_faces import ternaryfaces
+from quaternary_binary_lines import binarylines
 #fom file import not tested
 #doesn't expect more than 1 file per sample. in that case proabbly first one it fins is the one that gets auto-plotted with click but not sure
 
@@ -34,7 +35,38 @@ class ternaryfacesWidget(QDialog):
         self.setLayout(mainlayout)
         
         self.tf.scatter(comp, cols, s=20, edgecolors='none', **kwargs)
+
+class binarylinesWidget(QDialog):
+    def __init__(self, parent, comp, fom, ellabels=['A', 'B', 'C', 'D'], **kwargs):
+        super(binarylinesWidget, self).__init__(parent)
         
+        mainlayout=QVBoxLayout()
+        
+        self.plotw=plotwidget(self, width=8, height=4)
+        self.plotw.fig.clf()
+        self.ax=self.plotw.fig.add_axes([.3, .12, .6, .83])#add_subplot(111)
+        self.insetax=self.plotw.fig.add_axes([0, .7, .2, .3], projection='3d')
+        
+        self.bl=binarylines(self.ax, self.insetax, ellabels=ellabels, offset=.04)
+        
+        mainlayout.addWidget(self.plotw)
+        
+        self.buttonBox = QDialogButtonBox(self)
+        self.buttonBox.setGeometry(QRect(520, 195, 160, 26))
+        self.buttonBox.setOrientation(Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Ok)
+        QObject.connect(self.buttonBox, SIGNAL("accepted()"), self.accept)
+        mainlayout.addWidget(self.buttonBox)
+        
+        self.setLayout(mainlayout)
+
+        
+        self.bl.plotbinaryfom(comp, fom, **kwargs)
+        leg=self.ax.legend(loc=4, bbox_to_anchor = (-.15, 0.))
+        leg.draggable()
+
+
+
 class legendformatwidget(QDialog):
     def __init__(self, parent=None, title='', arr=None):
         super(legendformatwidget, self).__init__(parent)
@@ -431,8 +463,16 @@ class visdataDialog(QDialog):
         QObject.connect(self.elsLineEdit,SIGNAL("editingFinished()"),self.setupcomppermute)
         
         ternfacesPushButton=QPushButton()
-        ternfacesPushButton.setText("open tern.\nfaces plot")
+        ternfacesPushButton.setText("tern. faces")
         QObject.connect(ternfacesPushButton, SIGNAL("pressed()"), self.openternfacesplot)
+        
+        binlinesPushButton=QPushButton()
+        binlinesPushButton.setText("bin. lines")
+        QObject.connect(binlinesPushButton, SIGNAL("pressed()"), self.openbinlinesplot)
+        
+        openplotsLayout=QVBoxLayout()
+        openplotsLayout.addWidget(ternfacesPushButton)
+        openplotsLayout.addWidget(binlinesPushButton)
         
         selectFolder=QPushButton()
         selectFolder.setText("select\ndata folder")
@@ -525,7 +565,8 @@ class visdataDialog(QDialog):
         ctrllayout.addWidget(savecsvPushButton, 0, 2)
         ctrllayout.addLayout(elsLayout, 1, 2)
         ctrllayout.addWidget(selectFolder, 1, 1)
-        ctrllayout.addWidget(ternfacesPushButton, 2, 1)
+        #ctrllayout.addWidget(ternfacesPushButton, 2, 1)
+        ctrllayout.addLayout(openplotsLayout, 2, 1)
         ctrllayout.addLayout(temp, 2, 2)
         #ctrllayout.addWidget(ternstackComboBoxLabel, 2, 1)
         #ctrllayout.addWidget(self.ternstackComboBox, 2, 2)
@@ -669,6 +710,16 @@ class visdataDialog(QDialog):
         else:
             tfwidget=ternaryfacesWidget(self.parent, comp, col, ellabels=self.ellabels)
         tfwidget.exec_()
+    
+    def openbinlinesplot(self):
+        if self.ternfacesdata is None or self.fom is None:
+            print 'No data available for binary lines plot'
+            return
+        comp, col, sm=self.ternfacesdata
+        
+        widget=binarylinesWidget(self.parent, comp, col, ellabels=self.ellabels)
+        widget.ax.set_ylabel(self.fomkey)
+        widget.exec_()
         
     def plateclickprocess(self, coords_button_ax):
         if len(self.x)==0:
