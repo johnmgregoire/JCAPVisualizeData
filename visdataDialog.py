@@ -893,13 +893,14 @@ class visdataDialog(QDialog):
             self.plot()
 
     
-    def remfromselectsamples(self):# self.selectind
+    def remfromselectsamples(self, plot=True):# self.selectind
         if not self.selectind in self.sampleselectinds:
             return
         i=self.sampleselectinds.index(self.selectind)
         self.sampleselectinds.pop(i)
         self.selectsamplelines.pop(i)
-        self.plot()#would be nice to only have to plot overlay of selected samples
+        if plot:
+            self.plot()#would be nice to only have to plot overlay of selected samples
     
     def stackedplotsetup(self):
         a=numpy.sort(self.extractlist_dlistkey('A'))
@@ -1159,6 +1160,7 @@ class visdataDialog(QDialog):
         self.y=numpy.array(self.extractlist_dlistkey('y'))
         self.col=numpy.array(self.extractlist_dlistkey('col'))
         self.comp=numpy.array(self.extractlist_dlistkey('comp'))
+        self.code=numpy.array(self.extractlist_dlistkey('code'))
         self.smplist=self.platemapsmplist
         
         self.fomComboBox.clear()
@@ -1283,20 +1285,32 @@ class visdataDialog(QDialog):
         
     def addValuesComp(self, remove=False):
         compstr = str(self.compLineEdit.text())
+        codesstr=str(self.codesLineEdit.text())
+        if len(codesstr.strip())>0:
+            try:
+                filterbycodes=eval('['+codesstr+']')
+            except:
+                print 'error filtering by codes ', codesstr
+        else:
+            filterbycodes=None
         try:
             abcd=numpy.array(eval('['+compstr.strip()+']'))
             if abcd.sum()<=0.:
                 raise
             abcd/=abcd.sum()
-            i=numpy.argmin(numpy.array([((comp-abcd)**2).sum() for comp in self.comp]))
+            distarr=numpy.array([((comp-abcd)**2).sum() for comp in self.comp])
+            inds=numpy.where(distarr==distarr.min())[0]
+            inds=[i for i in inds if filterbycodes is None or self.code[i] in filterbycodes]
         except:
             print 'error adding samples'
             return
-        self.selectind=i
-        if remove:
-            self.remfromselectsamples()
-        else:
-            self.addtoselectsamples()
+        for i in inds:
+            plotbool=(i==inds[-1])
+            self.selectind=i
+            if remove:
+                self.remfromselectsamples(plot=plotbool)
+            else:
+                self.addtoselectsamples(plot=plotbool)
         
 #        try:
 #            s=unicode(self.compLineEdit.text())
