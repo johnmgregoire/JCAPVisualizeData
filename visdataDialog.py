@@ -903,14 +903,21 @@ class visdataDialog(QDialog):
             self.plot()#would be nice to only have to plot overlay of selected samples
     
     def stackedplotsetup(self):
-        a=numpy.sort(self.extractlist_dlistkey('A'))
-        adiff=(a[1:]-a[:-1])
-        adiff=(adiff[adiff>.001]).mean()
+        a=numpy.sort(self.extractlist_dlistkey('D'))
+        try:
+            a=a[self.code==0]
+        except:
+            pass
+        adiffall=(a[1:]-a[:-1])
+        adiff=(adiffall[adiffall>.001]).mean()
         nints=(1./adiff).round()
-        intervopts=[5, 10, 20, 30]
+        intervopts=[5, 10, 20, 30, 100]
         intervchoice=intervopts[numpy.argmin((nints-numpy.array(intervopts))**2)]
         #print 'difference in A channel,  number of a intervals per 100% and stacked plot choice are:',  adiff, nints, intervchoice
-        if intervchoice==5:
+        if intervchoice==100:
+            makefcn=make9of100ternaxes
+            self.stackplotfcn=scatter_9of100axes
+        elif intervchoice==5:
             makefcn=make5ternaxes
             self.stackplotfcn=scatter_5axes
         elif intervchoice==10:
@@ -922,7 +929,7 @@ class visdataDialog(QDialog):
         elif intervchoice==30:
             makefcn=make30ternaxes
             self.stackplotfcn=scatter_30axes
-        
+
         self.stackcompinterv=1./intervchoice
         self.plotw_stack.fig.clf()
         self.plotw_stack_axl, self.plotw_stack_stpl=makefcn(fig=self.plotw_stack.fig, ellabels=self.ellabels)
@@ -1152,7 +1159,6 @@ class visdataDialog(QDialog):
             
         self.platemapsmplist=self.extractlist_dlistkey('Sample')
         
-        self.stackedplotsetup()
         
         #instead of open data folder clear options and plot the platemap
         #self.openDataFolder()#have to open new datafolder if open new platemap
@@ -1162,6 +1168,8 @@ class visdataDialog(QDialog):
         self.comp=numpy.array(self.extractlist_dlistkey('comp'))
         self.code=numpy.array(self.extractlist_dlistkey('code'))
         self.smplist=self.platemapsmplist
+        
+        self.stackedplotsetup()
         
         self.fomComboBox.clear()
         self.fomComboBox.insertItem(0, 'composition/selected')
