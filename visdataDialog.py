@@ -903,7 +903,7 @@ class visdataDialog(QDialog):
             self.plot()#would be nice to only have to plot overlay of selected samples
     
     def stackedplotsetup(self):
-        a=numpy.array(self.extractlist_dlistkey('D'))
+        a=numpy.array(self.extractlist_dlistkey('A'))
         asort=numpy.argsort(a)
         a=a[asort]
         try:
@@ -912,7 +912,7 @@ class visdataDialog(QDialog):
             pass
         adiffall=(a[1:]-a[:-1])
         adiff=(adiffall[adiffall>.001]).mean()
-        abcd=numpy.column_stack(numpy.array(self.extractlist_dlistkey(ch)) for ch in ['A', 'B', 'C', 'D'])
+        abcd=numpy.column_stack(numpy.array(self.extractlist_dlistkey(ch)) for ch in ['A', 'B', 'C', 'D'] if len(set(self.extractlist_dlistkey(ch)))>1)
         abcd=numpy.sum(abcd, axis=1)
         abcd=(abcd[abcd>0]).mean()
         adiff=adiff/abcd #rescale adiff by "thickness"
