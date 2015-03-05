@@ -56,8 +56,11 @@ def smp_dict_generaltxt(path, delim='\t'): # can have raw data files with UV-vis
     z=[]
     column_headings=chs.split(delim)
     column_headings=[s.strip() for s in column_headings]
+    skipcols=['Date', 'Time']
+    skipinds=[i for i, col in enumerate(column_headings) if col in skipcols]
+    column_headings=[x for i, x in enumerate(column_headings) if i not in skipinds]
     myfloatfcn=lambda s:(len(s.strip())==0 and (float('NaN'),) or (float(s.strip()),))[0]#this turns emtpy string into NaN. given the .strip this only "works" if delimeter is not whitespace, e.g. csv
-    z=[map(myfloatfcn, l.split(delim)) for l in lines[firstdatalineind:]]
+    z=[map(myfloatfcn, [x for i, x in enumerate(l.split(delim)) if i not in skipinds]) for l in lines[firstdatalineind:]]
     for k, arr in zip(column_headings, numpy.float32(z).T):
         d[k]=arr
     return smp, d
