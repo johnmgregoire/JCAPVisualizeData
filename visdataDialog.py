@@ -9,7 +9,7 @@ from quaternary_binary_lines import binarylines
 
 
 class ternaryfacesWidget(QDialog):
-    def __init__(self, parent, comp, cols, cbaxrect=[.88, .2, .04, .6], ellabels=['A', 'B', 'C', 'D'], **kwargs):
+    def __init__(self, parent, comp, cols, cbaxrect=[.88, .2, .04, .6], ellabels=['A', 'B', 'C', 'D'], ms=1, **kwargs):
         super(ternaryfacesWidget, self).__init__(parent)
         
         mainlayout=QVBoxLayout()
@@ -33,8 +33,8 @@ class ternaryfacesWidget(QDialog):
         mainlayout.addWidget(self.buttonBox)
         
         self.setLayout(mainlayout)
-        
-        self.tf.scatter(comp, cols, s=20, edgecolors='none', **kwargs)
+
+        self.tf.scatter(comp, cols, s=20*ms, edgecolors='none', **kwargs)
 
 class binarylinesWidget(QDialog):
     def __init__(self, parent, comp, fom, ellabels=['A', 'B', 'C', 'D'], **kwargs):
@@ -470,6 +470,11 @@ class visdataDialog(QDialog):
         binlinesPushButton.setText("bin. lines")
         QObject.connect(binlinesPushButton, SIGNAL("pressed()"), self.openbinlinesplot)
         
+        self.ternmScaleLineEdit=QLineEdit()        
+        self.ternmScaleLineEdit.setText('1')
+        ternmScaleLineEditLabel=QLabel()
+        ternmScaleLineEditLabel.setText('ternary\nmarker scale:')
+        
         openplotsLayout=QVBoxLayout()
         openplotsLayout.addWidget(ternfacesPushButton)
         openplotsLayout.addWidget(binlinesPushButton)
@@ -555,12 +560,15 @@ class visdataDialog(QDialog):
         elsLayout=QVBoxLayout()
         elsLayout.addWidget(elsLineEditLabel)
         elsLayout.addWidget(self.elsLineEdit)
+
 #        temp=QHBoxLayout()
 #        temp.addLayout(elsLayout)
 #        temp.addWidget(ternfacesPushButton)
         temp=QHBoxLayout()
         temp.addWidget(ternstackComboBoxLabel)
         temp.addWidget(self.ternstackComboBox)
+        temp.addWidget(ternmScaleLineEditLabel)
+        temp.addWidget(self.ternmScaleLineEdit)
         
         ctrllayout.addWidget(savecsvPushButton, 0, 2)
         ctrllayout.addLayout(elsLayout, 1, 2)
@@ -673,12 +681,12 @@ class visdataDialog(QDialog):
                 fomcol[i]='r'
             fomcol=numpy.array(fomcol)
             inds2=numpy.where(numpy.abs(permcomp.sum(axis=1)-1.)<0.02)[0]
-            self.stackplotfcn(permcomp[inds2], fomcol[inds2], self.plotw_stack_stpl, s=8, edgecolors='none')
+            self.stackplotfcn(permcomp[inds2], fomcol[inds2], self.plotw_stack_stpl, s=18, edgecolors='none')
             self.ternfacesdata=(permcomp[inds2], fomcol[inds2], None)
         else:
             inds_inds=numpy.where(numpy.abs(permcomp[inds].sum(axis=1)-1.)<0.02)[0]
             inds2=inds[inds_inds]
-            self.stackplotfcn(permcomp[inds2], self.fom[inds2], self.plotw_stack_stpl, s=8, edgecolors='none', cmap=self.cmap, norm=self.norm, cb=False)
+            self.stackplotfcn(permcomp[inds2], self.fom[inds2], self.plotw_stack_stpl, s=18, edgecolors='none', cmap=self.cmap, norm=self.norm, cb=False)
             
             sm=cm.ScalarMappable(norm=self.norm, cmap=self.cmap)
             sm.set_array(self.fom[inds2])
@@ -704,7 +712,8 @@ class visdataDialog(QDialog):
         
         
         if not sm is None:
-            tfwidget=ternaryfacesWidget(self.parent, comp, col, ellabels=self.ellabels, cmap=self.cmap, norm=self.norm)
+            mscale=myeval(str(self.ternmScaleLineEdit.text()).strip())
+            tfwidget=ternaryfacesWidget(self.parent, comp, col, ellabels=self.ellabels, cmap=self.cmap, norm=self.norm, ms=mscale)
             cb=tfwidget.plotw.fig.colorbar(sm, cax=tfwidget.cbax, extend=self.extend, format=autocolorbarformat((self.vmin, self.vmax)))
             cb.set_label(self.fomkey, fontsize=18)
         else:
