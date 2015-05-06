@@ -565,10 +565,10 @@ class visdataDialog(QDialog):
 #        temp.addLayout(elsLayout)
 #        temp.addWidget(ternfacesPushButton)
         temp=QHBoxLayout()
-        temp.addWidget(ternstackComboBoxLabel)
-        temp.addWidget(self.ternstackComboBox)
         temp.addWidget(ternmScaleLineEditLabel)
         temp.addWidget(self.ternmScaleLineEdit)
+        temp.addWidget(ternstackComboBoxLabel)
+        temp.addWidget(self.ternstackComboBox)
         
         ctrllayout.addWidget(savecsvPushButton, 0, 2)
         ctrllayout.addLayout(elsLayout, 1, 2)
