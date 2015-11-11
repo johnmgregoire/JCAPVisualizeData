@@ -671,8 +671,10 @@ class visdataDialog(QDialog):
         self.plotw_plate.fig.canvas.draw()
         
         #comp plot
-        
-        self.stackedplotsetup()
+        try:
+            self.stackedplotsetup()
+        except:
+            pass
         permcomp=self.comp[:, self.comppermuteinds]
         self.cbax_stack.cla()
         if self.fom is None:
@@ -1137,7 +1139,10 @@ class visdataDialog(QDialog):
                 self.xycolplotchoiceComboBox.setCurrentIndex(0)
         self.sampleselectinds=[] #this is actually platemap select inds of the  already parsed inds in self.platemapindswithdata
         self.selectsamplelines=[]
-        self.fomcolorselected()
+        try:
+            self.fomcolorselected()
+        except:
+            pass
 
     def openPlateMap(self):
         p=mygetopenfile(parent=self, markstr='select platemap .txt')
@@ -1183,8 +1188,10 @@ class visdataDialog(QDialog):
         self.comp=numpy.array(self.extractlist_dlistkey('comp'))
         self.code=numpy.array(self.extractlist_dlistkey('code'))
         self.smplist=self.platemapsmplist
-        
-        self.stackedplotsetup()
+        try:
+            self.stackedplotsetup()
+        except:
+            pass
         
         self.fomComboBox.clear()
         self.fomComboBox.insertItem(0, 'composition/selected')
@@ -1199,7 +1206,10 @@ class visdataDialog(QDialog):
         self.sampleselectinds=[] 
         self.selectsamplelines=[]
         self.platemapindswithdata=range(len(self.smplist))#until data folder is read, reat all samples as if they have data
-        self.fomcolorselected() #this runs self.plot
+        try:
+            self.fomcolorselected() #this runs self.plot
+        except:
+            pass
 
     def fomcolorselected(self):
         if self.fomComboBox.currentIndex()==0 or len(self.datadlist)==0:
